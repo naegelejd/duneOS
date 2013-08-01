@@ -12,13 +12,15 @@ KERNDIR = kernel
 
 INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
 
-BOOTSECT := $(BOOTDIR)/sector.asm
+BOOTSECT = $(BOOTDIR)/sector.asm
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.asm)
 KERN_OBJS := start.o kernel.o io.o screen.o string.o gdt.o idt.o irq.o
 
-all: os-image
+IMAGE = duneOS.img
 
-os-image: loader.bin kernel.bin
+all: $(IMAGE)
+
+$(IMAGE): loader.bin kernel.bin
 	cat $^ > $@
 
 loader.bin: $(BOOTSECT)
@@ -33,8 +35,8 @@ kernel.bin: $(KERN_OBJS)
 %.o: $(KERNDIR)/%.asm
 	$(NASM) $(NFLAGS) $< -o $@
 
-run: os-image
+run: $(IMAGE)
 	qemu-system-i386 -boot order=adc -fda $<
 
 clean:
-	rm -f *.bin *.o os-image
+	rm -f *.bin *.o $(IMAGE)

@@ -77,9 +77,9 @@ void k_set_cursor (unsigned int offset)
 {
     offset /= 2;    /* convert from cell offset to char offset */
     outportb(REG_SCREEN_CTRL, 14);
-    outportb(REG_SCREEN_DATA, (unsigned char)(offset >> 8));
+    outportb(REG_SCREEN_DATA, (uint8_t)(offset >> 8));
     outportb(REG_SCREEN_CTRL, 15);
-    outportb(REG_SCREEN_DATA, (unsigned char)(offset));
+    outportb(REG_SCREEN_DATA, (uint8_t)(offset));
 }
 
 void k_clear_screen() // clear the entire text screen
@@ -94,7 +94,7 @@ void k_clear_screen() // clear the entire text screen
     k_set_cursor(0);
 }
 
-char k_putchar(char ch, unsigned char attr)
+char k_putchar(char ch, uint8_t attr)
 {
     char* vidmem = (char *) VIDEO_ADDR;
     if (!attr) {
