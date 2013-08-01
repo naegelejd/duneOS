@@ -23,16 +23,14 @@ extern void irq13();
 extern void irq14();
 extern void irq15();
 
-typedef void (*irq_handler)(struct regs *r);
-
 irq_handler irq_routines[NUM_IRQ_HANDLERS] = { 
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
-void irq_install_handler(int irq, void (*handler)(struct regs *r))
+void irq_install_handler(int irq, irq_handler handler)
 {
-    if ((irq > NUM_IRQ_HANDLERS) && (irq >= 0)) {
+    if ((irq < NUM_IRQ_HANDLERS) && (irq >= 0)) {
         irq_routines[irq] = handler;
     }
 }
@@ -85,7 +83,7 @@ void irq_install(void)
 void default_irq_handler(struct regs *r)
 {
     /* empty handler pointer */
-    void (*handler)(struct regs *r);
+    irq_handler handler;
 
     /* run custom handler if installed */
     int irq = r->int_no - 32;

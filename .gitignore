@@ -1,6 +1,13 @@
 *.bin
 *.img
 
+# Vim
+*.s[a-w][a-z]
+*.un~
+Session.vim
+.netrwhist
+*~
+
 # Object files
 *.o
 

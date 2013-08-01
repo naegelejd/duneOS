@@ -23,5 +23,7 @@ Obtain `qemu` then:
 References
 ----------
 Bran's Kernel Development Tutorial: http://www.osdever.net/bkerndev/Docs/title.htm
+
 Writing a Simple Operating System from Scratch (PDF): http://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
+
 Building GCC Cross-Compiler: http://wiki.osdev.org/GCC_Cross-Compiler

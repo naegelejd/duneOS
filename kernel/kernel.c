@@ -13,8 +13,13 @@ void main() {
     k_puts("ISRs installed\n");
 
     irq_install();
+    timer_install();
     k_puts("IRQ handlers installed\n");
 
     __asm__ __volatile ("sti");
+
+    delay(36);
+    k_puts("Okay.... let's get started\n");
+
     k_set_cursor(0);
 }
