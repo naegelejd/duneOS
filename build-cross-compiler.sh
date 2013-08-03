@@ -7,10 +7,12 @@
 
 set -e
 
-binutils_arch=binutils-2.23.2.tar.bz2
+binutils_ver=binutils-2.23.2
+binutils_arch=$binutils_ver.tar.bz2
 binutils_url=http://ftp.gnu.org/gnu/binutils/$binutils_arch
 
-libiconv_arch=libiconv-1.14.tar.gz
+libiconv_ver=libiconv-1.14
+libiconv_arch=$libiconv_ver.tar.gz
 libiconv_url=http://ftp.gnu.org/pub/gnu/libiconv/$libiconv_arch
 
 gcc_ver=gcc-4.8.1
@@ -30,9 +32,9 @@ test -d ~/src || mkdir ~/src
 cd ~/src
 curl -O $binutils_url
 tar xjf $binutils_arch
-mkdir binutils-build
+test -d binutils-build || mkdir binutils-build
 cd binutils-build
-../$binutils_arch/configure --target=$TARGET --prefix="$PREFIX" --disable-nls
+../$binutils_ver/configure --target=$TARGET --prefix="$PREFIX" --disable-nls
 make -j4
 make install
 
@@ -45,10 +47,10 @@ cd $gcc_ver
 cd ~/src
 curl -O $libiconv_url
 tar xzf $libiconv_arch
-mv $libiconv_arch $gcc_ver/libiconv
+test -d $gcc_ver/libiconv || mv $libiconv_ver $gcc_ver/libiconv
 
 cd ~/src
-mkdir gcc-build
+test -d gcc-build || mkdir gcc-build
 cd gcc-build
 ../$gcc_ver/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c --without-headers
 make all-gcc -j4
