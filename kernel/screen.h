@@ -10,5 +10,3 @@ void k_clear_screen();
 void k_puts(char *message);
 
 #endif
-
-

@@ -14,6 +14,7 @@ void main() {
 
     irq_install();
     timer_install();
+    keyboard_install();
     k_puts("IRQ handlers installed\n");
 
     __asm__ __volatile ("sti");

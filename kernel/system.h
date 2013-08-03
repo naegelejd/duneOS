@@ -23,5 +23,6 @@ void irq_install_handler(int irq, irq_handler handler);
 void timer_install();
 void delay(int ticks);
 
+void keyboard_install();
 
 #endif /* SYSTEM_H */
