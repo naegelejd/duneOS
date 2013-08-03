@@ -126,3 +126,21 @@ void k_puts(char *msg)
         k_putchar(c, WHITE_ON_BLACK);
     }
 }
+
+void k_putnum(intptr_t num)
+{
+    int n = 0;
+    unsigned int d = 1;
+    while ((num / d) >= 10) {
+        d *= 10;
+    }
+    while (d != 0) {
+        int dgt = num / d;
+        num %= d;
+        d /= 10;
+        if (n || dgt > 0 || d == 0) {
+            k_putchar(dgt + (dgt < 10 ? '0' : 'a' - 10), 0);
+            ++n;
+        }
+    }
+}

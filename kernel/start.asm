@@ -1,9 +1,11 @@
 ; vim:syntax=nasm
 [bits 32]
-[extern main]
 
-call main
-jmp $
+[extern main]
+global start
+start:
+    call main
+    jmp $
 
 ; extern void gdt_flush() in C
 ; this will set up segment registers then far jump 

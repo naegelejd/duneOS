@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+void reboot();
+void halt();
+
 struct regs
 {
     uint32_t gs, fs, es, ds;                /* pushed segs last */

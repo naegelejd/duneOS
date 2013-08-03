@@ -1,6 +1,7 @@
 #include <system.h>
 #include <io.h>
 #include <screen.h>
+#include "kb.h"
 
 /* US Keyboard Layout lookup table */
 unsigned char kdbus[] = {
@@ -51,7 +52,7 @@ static void toggle_caps_lock_light(void);
 void keyboard_handler(struct regs *r)
 {
     /* read from keyboard data register */
-    unsigned char data = inportb(0x60);
+    unsigned char data = inportb(KBD_DATA_REG);
     unsigned char scancode = data & 0x7F;
 
     if (data & 0x80) {
@@ -86,8 +87,8 @@ static void toggle_caps_lock_light(void)
 
 static void toggle_light(unsigned int light_code)
 {
-    while (inportb(0x64) & 2)
+    while (inportb(KBD_STATUS_REG) & KBD_STATUS_BUSY)
         ;
-    outportb(0x60, 0xED);
-    outportb(0x60, light_code & 0xF);
+    outportb(KBD_DATA_REG, 0xED);
+    outportb(KBD_DATA_REG, light_code & 0xF);
 }
