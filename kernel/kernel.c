@@ -19,8 +19,10 @@ void main() {
 
     __asm__ __volatile ("sti");
 
-    delay(36);
+    delay(1500);
     k_puts("Okay.... let's get started\n");
 
-    k_set_cursor(0);
+    beep(2);
+
+    //k_set_cursor(0);
 }

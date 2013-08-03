@@ -14,7 +14,7 @@ INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
 
 BOOTSECT = $(BOOTDIR)/sector.asm
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.asm)
-KERN_OBJS := start.o kernel.o io.o screen.o string.o gdt.o idt.o irq.o timer.o kb.o
+KERN_OBJS := start.o kernel.o io.o screen.o string.o gdt.o idt.o irq.o timer.o kb.o spkr.o
 
 IMAGE = duneOS.img
 
@@ -36,7 +36,7 @@ kernel.bin: $(KERN_OBJS)
 	$(NASM) $(NFLAGS) $< -o $@
 
 run: $(IMAGE)
-	qemu-system-i386 -boot order=adc -fda $<
+	qemu-system-i386 --soundhw pcspk -boot order=adc -fda $<
 
 clean:
 	rm -f *.bin *.o $(IMAGE)

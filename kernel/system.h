@@ -1,7 +1,7 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#include "stdint.h"
+#include <stdint.h>
 
 struct regs
 {
@@ -21,7 +21,8 @@ void irq_install();
 void irq_install_handler(int irq, irq_handler handler);
 
 void timer_install();
-void delay(int ticks);
+void delay(unsigned int ticks);
+void beep(unsigned int ticks);
 
 void keyboard_install();
 
