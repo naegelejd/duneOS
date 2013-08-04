@@ -1,6 +1,7 @@
 #include "system.h"
 #include "screen.h"
 #include "kb.h"
+#include "date.h"
 
 void main() {
     k_clear_screen();
@@ -51,10 +52,25 @@ void main() {
     k_putnum(&end);
     k_putchar('\n', 0);
 
+    struct tm dt;
+    datetime(&dt);
+    k_putnum(dt.hour);
+    k_putchar(':', 0);
+    k_putnum(dt.min);
+    k_putchar(':', 0);
+    k_putnum(dt.sec);
+    k_putchar(' ', 0);
+    k_puts(month_name(dt.month));
+    k_putchar(' ', 0);
+    k_putnum(dt.mday);
+    k_puts(", ");
+    k_putnum(dt.year);
+    k_putchar('\n', 0);
+
     /* playing around */
     k_set_cursor(0);
     beep(2);
-    delay(3000);
+    delay(5000);
     reboot();
 }
 
