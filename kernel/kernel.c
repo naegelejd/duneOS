@@ -1,5 +1,6 @@
 #include "system.h"
 #include "screen.h"
+#include "print.h"
 #include "kb.h"
 #include "rtc.h"
 
@@ -8,68 +9,41 @@ void main() {
     cli();
 
     k_clear_screen();
-    k_puts("Welcome to DuneOS...\n\n");
+    kprintf("Welcome to DuneOS...\n\n");
     
     gdt_install();
-    k_puts("GDT installed\n");
+    kprintf("GDT installed\n");
 
     idt_install();
-    k_puts("IDT installed\n");
-    k_puts("ISRs installed\n");
+    kprintf("IDT installed\n");
+    kprintf("ISRs installed\n");
 
     irq_install();
     timer_install();
     keyboard_install();
     rtc_install();
-    k_puts("IRQ handlers installed\n");
+    kprintf("IRQ handlers installed\n");
 
     sti();
 
 
     /* debugging */
-    extern intptr_t start;
-    extern intptr_t code;
-    extern intptr_t data;
-    extern intptr_t bss;
-    extern intptr_t end;
-    k_puts("Kernel size in bytes: ");
-    k_putnum((&end) - (&start));
-    k_putchar('\n', 0);
+    extern intptr_t start, code, data, bss, end;
+    kprintf("Kernel size in bytes: %u\n", &end - &start);
+    kprintf("Start: 0x%x\n", &start);
+    kprintf("Code: 0x%x\n", &code);
+    kprintf("Data: 0x%x\n", &data);
+    kprintf("BSS: 0x%x\n", &bss);
+    kprintf("End: 0x%x\n", &end);
 
-    k_puts("Start: ");
-    k_putnum(&start);
-    k_putchar('\n', 0);
 
-    k_puts("Code: ");
-    k_putnum(&code);
-    k_putchar('\n', 0);
-
-    k_puts("Data: ");
-    k_putnum(&data);
-    k_putchar('\n', 0);
-
-    k_puts("BSS: ");
-    k_putnum(&bss);
-    k_putchar('\n', 0);
-
-    k_puts("End: ");
-    k_putnum(&end);
-    k_putchar('\n', 0);
+    kprintf("0x%08x\n", 0xABC);
 
     struct tm dt;
     while (1) {
         datetime(&dt);
-        k_putnum(dt.hour);
-        k_putchar(':', 0);
-        k_putnum(dt.min);
-        k_putchar(':', 0);
-        k_putnum(dt.sec);
-        k_putchar(' ', 0);
-        k_puts(month_name(dt.month));
-        k_putchar(' ', 0);
-        k_putnum(dt.mday);
-        k_puts(", ");
-        k_putnum(dt.year);
+        kprintf("%u:%u:%u %s %u, %u\n", dt.hour, dt.min, dt.sec,
+                month_name(dt.month), dt.mday, dt.year);
         delay(2000);
     }
 

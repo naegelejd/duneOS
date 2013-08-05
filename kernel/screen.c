@@ -94,6 +94,12 @@ void k_clear_screen() // clear the entire text screen
     k_set_cursor(0);
 }
 
+
+void kputc(char ch)
+{
+    k_putchar(ch, WHITE_ON_BLACK);
+}
+
 char k_putchar(char ch, uint8_t attr)
 {
     char* vidmem = (char *) VIDEO_ADDR;
