@@ -1,5 +1,5 @@
-#ifndef DATE_H
-#define DATE_H
+#ifndef RTC_H
+#define RTC_H
 
 #include <stdint.h>
 

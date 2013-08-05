@@ -14,7 +14,7 @@ INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
 
 BOOTSECT = $(BOOTDIR)/sector.asm
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.asm)
-KERN_OBJS := start.o kernel.o io.o screen.o string.o gdt.o idt.o irq.o timer.o kb.o spkr.o date.o
+KERN_OBJS := start.o kernel.o io.o screen.o string.o gdt.o idt.o irq.o timer.o kb.o spkr.o rtc.o
 
 IMAGE = duneOS.img
 

@@ -1,9 +1,12 @@
 #include "system.h"
 #include "screen.h"
 #include "kb.h"
-#include "date.h"
+#include "rtc.h"
 
 void main() {
+    /* double check that interrupts are disabled */
+    cli();
+
     k_clear_screen();
     k_puts("Welcome to DuneOS...\n\n");
     
@@ -17,9 +20,10 @@ void main() {
     irq_install();
     timer_install();
     keyboard_install();
+    rtc_install();
     k_puts("IRQ handlers installed\n");
 
-    __asm__ __volatile ("sti");
+    sti();
 
 
     /* debugging */
@@ -29,7 +33,7 @@ void main() {
     extern intptr_t bss;
     extern intptr_t end;
     k_puts("Kernel size in bytes: ");
-    k_putnum(&end - &start);
+    k_putnum((&end) - (&start));
     k_putchar('\n', 0);
 
     k_puts("Start: ");
@@ -84,4 +88,14 @@ void reboot()
 void halt()
 {
     __asm__ ("cli\nhlt");
+}
+
+void cli()
+{
+    __asm__ ("cli");
+}
+
+void sti()
+{
+    __asm__("sti");
 }

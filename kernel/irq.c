@@ -5,7 +5,25 @@
 #define NUM_IRQ_HANDLERS    16
 
 /* These special IRQs point to the special IRQ handler
- * rather than the default 'fault_handler' */
+ * rather than the default 'fault_handler'
+ *
+ *  0        Programmable Interrupt Timer Interrupt
+ *  1        Keyboard Interrupt
+ *  2        Cascade (used internally by the two PICs. never raised)
+ *  3        COM2 (if enabled)
+ *  4        COM1 (if enabled)
+ *  5        LPT2 (if enabled)
+ *  6        Floppy Disk
+ *  7        LPT1 / Unreliable "spurious" interrupt (usually)
+ *  8        CMOS real-time clock (if enabled)
+ *  9        Free for peripherals / legacy SCSI / NIC
+ *  10       Free for peripherals / SCSI / NIC
+ *  11       Free for peripherals / SCSI / NIC
+ *  12       PS2 Mouse
+ *  13       FPU / Coprocessor / Inter-processor
+ *  14       Primary ATA Hard Disk
+ *  15       Secondary ATA Hard Disk
+ */
 extern void irq0();
 extern void irq1();
 extern void irq2();
@@ -42,16 +60,20 @@ void irq_install_handler(int irq, irq_handler handler)
  */
 void irq_remap(void)
 {
-    outportb(0x20, 0x11);
-    outportb(0xA0, 0x11);
-    outportb(0x21, 0x20);
-    outportb(0xA1, 0x28);
-    outportb(0x21, 0x04);
+    outportb(0x20, 0x11); /* write ICW1 to PICM, we are gonna write commands to PICM */
+    outportb(0xA0, 0x11); /* write ICW1 to PICS, we are gonna write commands to PICS */
+
+    outportb(0x21, 0x20); /* remap PICM to 0x20 (32 decimal) */
+    outportb(0xA1, 0x28); /* remap PICS to 0x28 (40 decimal) */
+
+    outportb(0x21, 0x04); /* IRQ2 -> connection to slave */ 
     outportb(0xA1, 0x02);
-    outportb(0x21, 0x01);
-    outportb(0xA1, 0x01);
-    outportb(0x21, 0x0);
-    outportb(0xA1, 0x0);
+
+    outportb(0x21, 0x01); /* write ICW4 to PICM, we are gonna write commands to PICM */
+    outportb(0xA1, 0x01); /* write ICW4 to PICS, we are gonna write commands to PICS */
+
+    outportb(0x21, 0x0); /* enable all IRQs on PICM */
+    outportb(0xA1, 0x0); /* enable all IRQs on PICS */
 }
 
 void irq_install(void)

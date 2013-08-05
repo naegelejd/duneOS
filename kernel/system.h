@@ -6,6 +6,8 @@
 
 void reboot();
 void halt();
+void cli();
+void sti();
 
 struct regs
 {
@@ -29,5 +31,7 @@ void delay(unsigned int ticks);
 void beep(unsigned int ticks);
 
 void keyboard_install();
+
+void rtc_install(void);
 
 #endif /* SYSTEM_H */
