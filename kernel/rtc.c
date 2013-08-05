@@ -71,64 +71,70 @@ void datetime(struct tm *tm_out)
 
 void rtc_handler(struct regs *r)
 {
-    /* don't need to do this since this is triggered by INT8 (RTC) */
-    /*
-    uint8_t update_in_progress = 1;
-    while (update_in_progress) {
-        update_in_progress = read_cmos(CMOS_STATUS_REGA);
-    }
-    */
+    static unsigned int ticks = 0;
 
-    uint8_t sec = read_cmos(0x0);
-    uint8_t min = read_cmos(0x02);
-    uint8_t hour = read_cmos(0x04);
-    uint8_t wday = read_cmos(0x06);
-    uint8_t mday = read_cmos(0x07);
-    uint8_t month = read_cmos(0x08);
-    uint16_t year = (uint8_t)read_cmos(0x09);
-    /* There is an "RTC century register" at offset 108 in ACPI's
-     * "Fixed ACPI Description Table". If this byte is 0, then the RTC
-     * does not have a century register, otherwise, it is the number
-     * of the RTC register to use for the century...
-     *
-     * if it existed:
-     * uint8_t century = read_cmos(CMOS_CENTURY_REG);
-     *
-     * For now, I'm going to 'deduce' the century based on the year
+    /* only read CMOS registers once a second (RTC @ 1024Hz)
+     * in testing using QEMU, the RTC was very finnicky regarding
+     * CMOS reads immediately after the RTC periodic interrupt is fired.
+     * There's no reason to read the CMOS values at 1024Hz anyway, but I like
+     * using an IRQ handler to populate a static date-time struct regularly
+     * rather than performing the CMOS reads on demand.
      */
+    ticks++;
+    if (ticks / 1024) {
+        ticks = 0;
 
-    /* convert values if they're packed BCD */
-    if (CMOS_BCD_VALUES) {
-        sec = BCD2BIN(sec);
-        min = BCD2BIN(min);
-        hour = BCD2BIN(hour);
-        wday = BCD2BIN(wday);
-        mday = BCD2BIN(mday);
-        month = BCD2BIN(month);
-        year = BCD2BIN(year);
+        uint8_t sec = read_cmos(0x0);
+        uint8_t min = read_cmos(0x02);
+        uint8_t hour = read_cmos(0x04);
+        uint8_t wday = read_cmos(0x06);
+        uint8_t mday = read_cmos(0x07);
+        uint8_t month = read_cmos(0x08);
+        uint16_t year = (uint8_t)read_cmos(0x09);
+        /* There is an "RTC century register" at offset 108 in ACPI's
+        * "Fixed ACPI Description Table". If this byte is 0, then the RTC
+        * does not have a century register, otherwise, it is the number
+        * of the RTC register to use for the century...
+        *
+        * if it existed:
+        * uint8_t century = read_cmos(CMOS_CENTURY_REG);
+        *
+        * For now, I'm going to 'deduce' the century based on the year
+        */
+
+        /* convert values if they're packed BCD */
+        if (CMOS_BCD_VALUES) {
+            sec = BCD2BIN(sec);
+            min = BCD2BIN(min);
+            hour = BCD2BIN(hour);
+            wday = BCD2BIN(wday);
+            mday = BCD2BIN(mday);
+            month = BCD2BIN(month);
+            year = BCD2BIN(year);
+        }
+
+        /* convert hour from 12-hour to 24-hour if necessary */
+        uint8_t regB = read_cmos(CMOS_STATUS_REGB);
+        if (!(regB & 0x02) && (hour & 0x80)) {
+            hour = ((hour & 0x7F) + 12) % 24;
+        }
+
+        /* fix year depending on century */
+        year += (CURRENT_YEAR / 100) * 100;
+        if (year < CURRENT_YEAR) {
+            year += 100;
+        }
+
+        g_datetime.sec = sec;
+        g_datetime.min = min;
+        g_datetime.hour = hour;
+        g_datetime.wday = wday;
+        g_datetime.mday = mday;
+        g_datetime.month = month;
+        g_datetime.year = year;
+        g_datetime.yday = 0;
+        g_datetime.isdst = 0;
     }
-
-    /* convert hour from 12-hour to 24-hour if necessary */
-    uint8_t regB = read_cmos(CMOS_STATUS_REGB);
-    if (!(regB & 0x02) && (hour & 0x80)) {
-        hour = ((hour & 0x7F) + 12) % 24;
-    }
-
-    /* fix year depending on century */
-    year += (CURRENT_YEAR / 100) * 100;
-    if (year < CURRENT_YEAR) {
-        year += 100;
-    }
-
-    g_datetime.sec = sec;
-    g_datetime.min = min;
-    g_datetime.hour = hour;
-    g_datetime.wday = wday;
-    g_datetime.mday = mday;
-    g_datetime.month = month;
-    g_datetime.year = year;
-    g_datetime.yday = 0;
-    g_datetime.isdst = 0;
 
     /* register C must be read for another interrupt to occur
      * select register C, read, throw it away */
@@ -154,9 +160,8 @@ void rtc_install(void)
         CMOS_BCD_VALUES = true;
     }
 
+    /* enable IRQ8 (RTC) */
     /* interrupts must be disabled! */
-    outportb(CMOS_ADDR_REG, 0x8B);          /* select register B, disable NMI */
-    uint8_t prev = inportb(CMOS_DATA_REG);  /* read register B */
-    outportb(CMOS_ADDR_REG, 0x8B);          /* set the index again */
-    outportb(CMOS_DATA_REG, prev | 0x40);   /* write previous value with bit 6 turned on */
+    uint8_t prev = read_cmos(CMOS_STATUS_REGB);     /* read CMOS register B */
+    write_cmos(CMOS_STATUS_REGB, prev | 0x40);      /* write previous value with bit 6 turned on */
 }

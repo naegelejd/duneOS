@@ -57,25 +57,29 @@ void main() {
     k_putchar('\n', 0);
 
     struct tm dt;
-    datetime(&dt);
-    k_putnum(dt.hour);
-    k_putchar(':', 0);
-    k_putnum(dt.min);
-    k_putchar(':', 0);
-    k_putnum(dt.sec);
-    k_putchar(' ', 0);
-    k_puts(month_name(dt.month));
-    k_putchar(' ', 0);
-    k_putnum(dt.mday);
-    k_puts(", ");
-    k_putnum(dt.year);
-    k_putchar('\n', 0);
+    while (1) {
+        datetime(&dt);
+        k_putnum(dt.hour);
+        k_putchar(':', 0);
+        k_putnum(dt.min);
+        k_putchar(':', 0);
+        k_putnum(dt.sec);
+        k_putchar(' ', 0);
+        k_puts(month_name(dt.month));
+        k_putchar(' ', 0);
+        k_putnum(dt.mday);
+        k_puts(", ");
+        k_putnum(dt.year);
+        delay(2000);
+    }
 
     /* playing around */
+    /*
     k_set_cursor(0);
     beep(2);
     delay(5000);
     reboot();
+    */
 }
 
 /* hack a hard reset by loading a bogus IDT */
