@@ -7,10 +7,7 @@
 /* print a formatted string to terminal */
 size_t kprintf(char *fmt, ...);
 
-/* construct a formatted string in buffer 's'
- * no more than size bytes will be written.
- * if the result is < size bytes, the rest will be zero-padded
- */
-size_t ksnprintf(char *s, size_t size, char *fmt, ...);
+/* construct a formatted string in buffer 's' */
+size_t ksprintf(char *s, char *fmt, ...);
 
 #endif /* PRINTK_H */

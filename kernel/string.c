@@ -22,7 +22,7 @@ void memcpy(char *dst, char *src, size_t n)
 int strlen(char *s)
 {
     int l = 0;
-    while (*s++ != 0) {
+    while (*s++) {
         l++;
     }
     return l;

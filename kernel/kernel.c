@@ -36,9 +36,22 @@ void main() {
     kprintf("BSS: 0x%x\n", &bss);
     kprintf("End: 0x%x\n", &end);
 
+    /*
+    char buf[15];
+    ksprintf(buf, "%s %d\n", "Hello", 42);
+    kprintf(buf);
 
-    kprintf("0x%08x\n", 0xABC);
+    kprintf("%04d\n", 42);
+    kprintf("%04d\n", 12345);
+    kprintf("%04x\n", 0xabcde);
+    kprintf("%04X\n", 0xFE);
+    kprintf("%4d\n", 42);
+    kprintf("%4d\n", 12345);
+    kprintf("%4X\n", 0xabcde);
+    kprintf("%4x\n", 0xFE);
+    */
 
+    /*
     struct tm dt;
     while (1) {
         datetime(&dt);
@@ -46,6 +59,7 @@ void main() {
                 month_name(dt.month), dt.mday, dt.year);
         delay(2000);
     }
+    */
 
     /* playing around */
     /*

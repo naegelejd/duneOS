@@ -1,8 +1,21 @@
 #include <stdbool.h>
 #include "print.h"
+#include "string.h"
 #include "screen.h" /* for kputc */
 
+
+enum { NUM_BUF_SIZE = 12 };
+
 typedef void (*cput_t) (char **, char);
+
+static void putc_screen(char **, char);
+static void putc_string(char **, char);
+static size_t uint2str(char *, unsigned int, unsigned int, bool);
+static int a2d(char);
+static unsigned int str2uint(char **, int);
+static void put_string(char **, cput_t, char *, int, bool);
+static size_t kvasprintf(char **, cput_t, char *, va_list);
+
 
 /* calls kputc to put a char on the screen */
 static void putc_screen(char **s, char c)
@@ -16,11 +29,9 @@ static void putc_string(char **s, char c)
     *(*s)++ = c;
 }
 
-enum { NUM_BUF_SIZE = 12 };
-
-static void uint2str(char *buf, unsigned int num, unsigned int base, bool uppercase)
+static size_t uint2str(char *buf, unsigned int num, unsigned int base, bool uppercase)
 {
-    unsigned int n = 0;
+    size_t n = 0;
     unsigned int d = 1;
     while ((num / d) >= base) {
         d *= base;
@@ -35,10 +46,12 @@ static void uint2str(char *buf, unsigned int num, unsigned int base, bool upperc
         }
     }
     *buf = 0;
+    return n;
 }
 
 static int a2d(char c)
 {
+    /* kprintf("c: %c\n", c); */
     if (c >= '0' && c <= '9') {
         return c - '0';
     } else if (c >= 'a' && c <= 'f') {
@@ -53,16 +66,21 @@ static int a2d(char c)
 static unsigned int str2uint(char **s, int base)
 {
     int digit = 0, num = 0;
-    while ((digit = a2d(*(*s)++)) >= 0) {
+    char *p = *s;
+    while ((digit = a2d(*p++)) >= 0) {
+        /* kprintf("dgt: %d\n", digit); */
         if (digit > base) {
             break;
         }
         num = num * base + digit;
     }
+
+    /* rewind one char since it wasn't numeric and fast-forward 's' */
+    *s = --p;
     return num;
 }
 
-static void put_string(char **s, cput_t put, char *out, unsigned int pad, bool ldng_zero)
+static void put_string(char **s, cput_t put, char *out, int pad, bool ldng_zero)
 {
     char c = 0;
     char padding = ldng_zero ? '0' : ' ';   /* determine the type of left-padding */
@@ -85,28 +103,35 @@ static void put_string(char **s, cput_t put, char *out, unsigned int pad, bool l
 }
 
 
-static size_t vkprint(char **s, size_t size, cput_t put, char *fmt, va_list arg)
+static size_t kvasprintf(char **dest, cput_t put, char *fmt, va_list arg)
 {
-    char buffer[NUM_BUF_SIZE];
+    char num_buf[NUM_BUF_SIZE];     /* for reading numbers */
+    char* str_buf;                  /* for reading strings */
     char c;
-    size_t len = 0;
-    size = size - 1;    /* if size is 0, size - 1 is huge (unsigned) */
+    size_t length = 0, count = 0;
 
     while ((c = *fmt++)) {
+        bool ldng_zero = false;
+        unsigned int pad = 0;
+
         if (c != '%') {
-            put(s, c);
-            len++;
+            num_buf[0] = c;
+            num_buf[1] = 0;
+            count = 2;
         } else {
-            bool ldng_zero = false;
-            unsigned int pad = 0;
-            c = *fmt++;
-            if (c == '0') {
+            /* eat up leading zeros */
+            while ((c = *fmt++) == '0') {
                 ldng_zero = true;
-                c = *fmt++;
-            } else if (c > '0' && c < '9') {
+            }
+
+            /* determine the 'amount' of padding */
+            if (c > '0' && c < '9') {
                 --fmt;
                 pad = str2uint(&fmt, 10);
+                c = *fmt++;
             }
+
+            /* handle format specifier */
             switch (c) {
 
                 case 0:
@@ -114,54 +139,60 @@ static size_t vkprint(char **s, size_t size, cput_t put, char *fmt, va_list arg)
                     break;
 
                 case '%':
-                    put(s, c);
+                    num_buf[0] = c;
+                    num_buf[1] = 0;
+                    count = 2;
                     break;
 
                 case 'x': 
                 case 'X':
-                    uint2str(buffer, va_arg(arg, unsigned int), 16, (c == 'X'));
-                    put_string(s, put, buffer, pad, ldng_zero);
+                    count = uint2str(num_buf, va_arg(arg, unsigned int),
+                            16, (c == 'X'));
                     break;
 
                 case 'd': {
                     int x = va_arg(arg, int);
                     if (x < 0) {
-                        put(s, '-');
+                        num_buf[0] = '-';
                         x = -x;
+                        count = uint2str(num_buf + 1, x, 10, false);
+                    } else {
+                        count = uint2str(num_buf, x, 10, false);
                     }
-                    uint2str(buffer, x, 10, false);
-                    put_string(s, put, buffer, pad, ldng_zero);
                     break;
                 }
 
                 case 'u':
-                    uint2str(buffer, va_arg(arg, unsigned int), 10, false);
-                    put_string(s, put, buffer, pad, ldng_zero);
+                    count = uint2str(num_buf, va_arg(arg, unsigned int), 10, false);
                     break;
 
-                case 's':
-                    put_string(s, put, va_arg(arg, char*), 0, false);
+                case 's': {
+                    str_buf = va_arg(arg, char*);
+                    count = strlen(str_buf);
                     break;
+                }
                 
                 case 'c':
-                    put(s, (char)va_arg(arg, int));
+                    num_buf[0] = c;
+                    num_buf[1] = 0;
+                    count = 2;
                     break;
 
                 default:
                     ;
             }
-            len++;
         }
 
-        /*
-        if (len >= size) {
-            put(s, 0);
-            goto vkprint_end
+        length += count;
+        if (str_buf) {
+            put_string(dest, put, str_buf, pad, ldng_zero);
+            str_buf = NULL;
+        } else {
+            put_string(dest, put, num_buf, pad, ldng_zero);
         }
-        */
     }
 vkprint_end:
-    return len;
+    return length;
 }
 
 
@@ -171,19 +202,19 @@ size_t kprintf(char *fmt, ...)
     size_t sz;
 
     va_start(arg, fmt);
-    sz = vkprint(NULL, 0, putc_screen, fmt, arg);
+    sz = kvasprintf(NULL, putc_screen, fmt, arg);
     va_end(arg);
 
     return sz;
 }
 
-size_t ksnprintf(char *s, size_t size, char *fmt, ...)
+size_t ksprintf(char *s, char *fmt, ...)
 {
     va_list arg;
     size_t sz;
 
     va_start(arg, fmt);
-    sz = vkprint(&s, size, putc_string, fmt, arg);
+    sz = kvasprintf(&s, putc_string, fmt, arg);
     va_end(arg);
 
     return sz;
