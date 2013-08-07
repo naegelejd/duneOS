@@ -5,7 +5,9 @@
 # Install gcc 4.8 and 'select' it using macports
 # Build binutils, gcc and its dependencies:
 
-set -e
+set -v
+
+build_dir=$HOME/src
 
 binutils_ver=binutils-2.23.2
 binutils_arch=$binutils_ver.tar.bz2
@@ -22,34 +24,34 @@ gcc_url=ftp://aeneas.mit.edu/pub/gnu/gcc/$gcc_ver/$gcc_arch
 export PREFIX=$HOME/opt/cross
 export TARGET=i386-elf
 export PATH=$PREFIX/bin:$PATH
-export CC=/opt/local/bin/gcc
-export CXX=/opt/local/bin/g++
-export CPP=/opt/local/bin/cpp
-export LD=/opt/local/bin/gcc
+export CC=gcc
+export CXX=g++
+export CPP=cpp
+export LD=gcc
 
-test -d ~/src || mkdir ~/src
+test -d $build_dir || mkdir $build_dir
 
-cd ~/src
-curl -O $binutils_url
-tar xjf $binutils_arch
+cd $build_dir
+test -f $binutils_arch || curl -O $binutils_url
+test -d $binutils_ver || tar xjf $binutils_arch
 test -d binutils-build || mkdir binutils-build
 cd binutils-build
 ../$binutils_ver/configure --target=$TARGET --prefix="$PREFIX" --disable-nls
 make -j4
 make install
 
-cd ~/src
-curl -O $gcc_url
-tar xjf $gcc_arch
+cd $build_dir
+test -f $gcc_arch || curl -O $gcc_url
+test -d $gcc_ver || tar xjf $gcc_arch
 cd $gcc_ver
 ./contrib/download_prerequisites
 
-cd ~/src
-curl -O $libiconv_url
-tar xzf $libiconv_arch
+cd $build_dir
+test -f $libiconv_arch || curl -O $libiconv_url
+test -d $libiconv_ver || tar xzf $libiconv_arch
 test -d $gcc_ver/libiconv || mv $libiconv_ver $gcc_ver/libiconv
 
-cd ~/src
+cd $build_dir
 test -d gcc-build || mkdir gcc-build
 cd gcc-build
 ../$gcc_ver/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c --without-headers
