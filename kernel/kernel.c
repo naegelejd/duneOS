@@ -1,14 +1,23 @@
 #include "system.h"
+#include "multiboot.h"
 #include "screen.h"
 #include "print.h"
 #include "kb.h"
 #include "rtc.h"
 
-void main() {
+int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
+{
     /* double check that interrupts are disabled */
-    cli();
-
+    /* cli(); */
     k_clear_screen();
+
+    if (mboot_magic == MULTIBOOT_BOOTLOADER_MAGIC) {
+        kprintf("Multiboot Successful\n");
+    } else {
+        kprintf("Bad multiboot\n");
+        return 1;
+    }
+
     kprintf("Welcome to DuneOS...\n\n");
     
     gdt_install();
@@ -28,6 +37,9 @@ void main() {
 
 
     /* debugging */
+    kprintf("Memory low: 0x%x\n", mbinfo->mem_lower);
+    kprintf("Memory high: 0x%x\n", mbinfo->mem_upper);
+
     extern intptr_t start, code, data, bss, end;
     kprintf("Kernel size in bytes: %u\n", &end - &start);
     kprintf("Start: 0x%x\n", &start);
@@ -68,6 +80,7 @@ void main() {
     delay(5000);
     reboot();
     */
+    return 0;
 }
 
 /* hack a hard reset by loading a bogus IDT */

@@ -1,42 +1,47 @@
 CCHOME = $(HOME)/opt/cross
 
 CC = $(CCHOME)/bin/i386-elf-gcc
-LD = $(CCHOME)/bin/i386-elf-ld
 NASM = nasm
 
-CFLAGS = -std=c99 -O0 -Wall -Wextra -pedantic -nostdinc -ffreestanding -finline-functions
-NFLAGS = -f elf
+CFLAGS = -std=c99 -O0 -Wall -Wextra -pedantic -nostdlib -nostdinc -ffreestanding -finline-functions
+NFLAGS = -felf
 
-BOOTDIR = boot
 KERNDIR = kernel
+OBJDIR = obj
 
 INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
 
-BOOTSECT = $(BOOTDIR)/sector.asm
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.asm)
-KERN_OBJS := start.o kernel.o io.o gdt.o idt.o irq.o timer.o kb.o spkr.o rtc.o screen.o string.o print.o
+KERN_OBJS := $(addprefix $(OBJDIR)/,start.o kernel.o io.o gdt.o idt.o irq.o \
+	timer.o kb.o spkr.o rtc.o screen.o string.o print.o)
 
-IMAGE = duneOS.img
+KERNEL = kernel.bin
 
-all: $(IMAGE)
+QEMU = qemu-system-i386
+QARGS = -m 512
 
-$(IMAGE): loader.bin kernel.bin
-	cat $^ > $@
+all: $(KERNEL)
 
-loader.bin: $(BOOTSECT)
-	$(NASM) $< -f bin -o $@
+$(KERNEL): $(KERN_OBJS)
+	#$(CC) $(CFLAGS) -nostdlib -o $@ -T $(KERNDIR)/link.ld $^
+	$(CC) $(CFLAGS) -o $@ -T $(KERNDIR)/link.ld $^
 
-kernel.bin: $(KERN_OBJS)
-	$(LD) -o $@ -T $(KERNDIR)/link.ld $^ --oformat binary
-
-%.o: $(KERNDIR)/%.c
+$(OBJDIR)/%.o: $(KERNDIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-%.o: $(KERNDIR)/%.asm
+$(OBJDIR)/%.o: $(KERNDIR)/%.s
 	$(NASM) $(NFLAGS) $< -o $@
 
-run: $(IMAGE)
-	qemu-system-i386 --soundhw pcspk -boot order=adc -fda $<
+$(KERN_OBJS): | $(OBJDIR)
+
+$(OBJDIR):
+	test -d $(OBJDIR) || mkdir $(OBJDIR)
+
+run: $(KERNEL)
+	$(QEMU) $(QARGS) -kernel $<
 
 clean:
-	rm -f *.bin *.o $(IMAGE)
+	rm -f $(OBJDIR)/*.o $(KERNEL)
+
+distclean:
+	rmdir $(OBJDIR)

@@ -1,11 +1,48 @@
 ; vim:syntax=nasm
-[bits 32]
+bits 32
+align 4
+
+MBOOT_PAGE_ALIGN equ 0x1
+MBOOT_MEM_INFO equ 0x2
+MBOOT_USE_GFX equ 0x4
+MBOOT_HDR_MAGIC equ 0x1BADB002
+;MBOOT_HDR_FLAGS equ MBOOT_PAGE_ALIGN | MBOOT_MEM_INFO | MBOOT_USE_GFX
+MBOOT_HDR_FLAGS equ MBOOT_PAGE_ALIGN | MBOOT_MEM_INFO
+MBOOT_CHECKSUM equ -(MBOOT_HDR_MAGIC + MBOOT_HDR_FLAGS)
+
+; start of kernel image:
+multiboot:
+    dd MBOOT_HDR_MAGIC
+    dd MBOOT_HDR_FLAGS
+    dd MBOOT_CHECKSUM
+    ; Mem info (only valid if aout kludge flag set)
+    dd 0x00000000   ; header address
+    dd 0x00000000   ; load address
+    dd 0x00000000   ; load end address
+    dd 0x00000000   ; bss end address
+    dd 0x00000000   ; entry address
+    ; Graphics requests (only valid if graphics flag set)
+    ;dd 0x00000000   ; linear graphics
+    ;dd 0            ; width
+    ;dd 0            ; height
+    ;dd 32           ; set to 32
+
 
 [extern main]
 global start
 start:
+    ;mov esp, stack_top  ; set up stack pointer
+    mov esp, 0x7FFF  ; set up stack pointer
+    ;push esp   ; push stack pointer
+    push eax    ; push header magic
+    push ebx    ; push header pointer
+    cli
     call main
-    jmp $
+
+    cli
+.hang:
+    hlt
+    jmp .hang
 
 ; extern void gdt_flush() in C
 ; this will set up segment registers then far jump 
@@ -441,3 +478,6 @@ irq_common_stub:
     add esp, 8
     iret
 
+
+section .bss
+    resb 8192   ; reserve 8K
