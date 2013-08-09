@@ -20,6 +20,7 @@ static size_t kvasprintf(char **, cput_t, char *, va_list);
 /* calls kputc to put a char on the screen */
 static void putc_screen(char **s, char c)
 {
+    (void)s;    /* prevent 'unused parameter' warning */
     kputc(c);
 }
 
@@ -105,9 +106,9 @@ static void put_string(char **s, cput_t put, char *out, int pad, bool ldng_zero)
 
 static size_t kvasprintf(char **dest, cput_t put, char *fmt, va_list arg)
 {
-    char num_buf[NUM_BUF_SIZE];     /* for reading numbers */
-    char* str_buf;                  /* for reading strings */
-    char c;
+    char num_buf[NUM_BUF_SIZE] = "\0";      /* for reading numbers */
+    char* str_buf = NULL;                   /* for reading strings */
+    char c = 0;
     size_t length = 0, count = 0;
 
     while ((c = *fmt++)) {

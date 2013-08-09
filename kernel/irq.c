@@ -110,10 +110,14 @@ void default_irq_handler(struct regs *r)
     /* run custom handler if installed */
     int irq = r->int_no - 32;
     if ((irq < NUM_IRQ_HANDLERS) && (irq >= 0)) {
-        handler = irq_routines[r->int_no - 32];
-        if (handler) {
-            handler(r);
-        }
+        handler = irq_routines[irq];
+    } else {
+        handler = NULL;
+    }
+
+    /* execute IRQ-specific handler if one exists */
+    if (handler) {
+        handler(r);
     }
 
     /* if the IDT entry invoked is greater than 40

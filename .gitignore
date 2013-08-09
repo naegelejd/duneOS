@@ -5,6 +5,8 @@
 isodir/
 obj/
 
+tags
+
 # Vim
 *.s[a-w][a-z]
 *.un~

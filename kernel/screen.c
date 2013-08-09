@@ -7,6 +7,7 @@
 #define VIDEO_COLS      80
 
 #define WHITE_ON_BLACK      0x0f
+#define RED_ON_BLACK        0x04
 
 /* Screen device I/O ports */
 #define REG_SCREEN_CTRL     0x3D4
@@ -100,7 +101,7 @@ void kputc(char ch)
     k_putchar(ch, WHITE_ON_BLACK);
 }
 
-char k_putchar(char ch, uint8_t attr)
+char k_putchar(unsigned char ch, uint8_t attr)
 {
     char* vidmem = (char *) VIDEO_ADDR;
     if (!attr) {
@@ -113,6 +114,9 @@ char k_putchar(char ch, uint8_t attr)
         int row = offset / (VIDEO_COLS * 2);
         offset = k_get_screen_offset(0, row + 1);
     } else {
+        if (ch < 0x20 || ch > 0x7f) {
+            attr = RED_ON_BLACK;
+        }
         vidmem[offset] = ch;
         vidmem[offset+1] = attr;
         offset += 2;

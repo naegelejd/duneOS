@@ -5,14 +5,15 @@
 #include "kb.h"
 #include "rtc.h"
 
-extern intptr_t start, code, data, bss, end;
+extern uintptr_t start, code, data, bss, end;
 
 int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* double check that interrupts are disabled */
     /* cli(); */
-    k_clear_screen();
 
+    k_clear_screen();
+    kprintf("Welcome to DuneOS...\n\n");
     if (mboot_magic == MULTIBOOT_BOOTLOADER_MAGIC) {
         kprintf("Multiboot Successful\n");
     } else {
@@ -20,19 +21,14 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
         return 1;
     }
 
-    kprintf("Welcome to DuneOS...\n\n");
-    
     gdt_install();
     kprintf("GDT installed\n");
-
     idt_install();
-    kprintf("IDT installed\n");
-    kprintf("ISRs installed\n");
-
+    kprintf("IDT and ISRs installed\n");
     irq_install();
     kprintf("IRQ handlers installed\n");
 
-    paging_install(end);
+    paging_install(&end);
     kprintf("Paging enabled\n");
 
     timer_install();
@@ -41,9 +37,11 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     sti();
 
+    uint32_t* page_fault = &end + 0x4000000;
+    kprintf("page fault? %u\n", *page_fault);
 
+    /*
     if (mbinfo->flags & MULTIBOOT_INFO_MEMORY) {
-        /* debugging */
         kprintf("Memory low: 0x%x\n", mbinfo->mem_lower);
         kprintf("Memory high: 0x%x\n", mbinfo->mem_upper);
     } else {
@@ -56,6 +54,7 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("Data: 0x%x\n", &data);
     kprintf("BSS: 0x%x\n", &bss);
     kprintf("End: 0x%x\n", &end);
+    */
 
     /*
     char buf[15];
@@ -84,6 +83,8 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     /* playing around */
     /*
+    kprintf("%u\n", 1 / 0);
+
     k_set_cursor(0);
     beep(2);
     delay(5000);

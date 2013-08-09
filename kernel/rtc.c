@@ -71,6 +71,7 @@ void datetime(struct tm *tm_out)
 
 void rtc_handler(struct regs *r)
 {
+    (void)r;    /* prevent 'unused parameter' warning */
     static unsigned int ticks = 0;
 
     /* only read CMOS registers once a second (RTC @ 1024Hz)

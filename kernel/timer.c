@@ -23,6 +23,7 @@ uint32_t timer_ticks = 0;
  */
 void timer_handler(struct regs *r)
 {
+    (void)r;    /* prevent 'unused' parameter warning */
     timer_ticks++;
     /*
     if (timer_ticks % 1000 == 0) {

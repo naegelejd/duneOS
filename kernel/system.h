@@ -26,7 +26,7 @@ typedef void (*irq_handler)(struct regs *r);
 void irq_install();
 void irq_install_handler(int irq, irq_handler handler);
 
-void paging_install(uint32_t end);
+void paging_install(uint32_t* end);
 
 void timer_install();
 void delay(unsigned int ticks);

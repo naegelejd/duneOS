@@ -2,7 +2,7 @@
 
 #include <system.h>
 #include "string.h"
-#include "screen.h"
+#include "print.h"
 
 /*
  * IDT flag bits:
@@ -111,9 +111,9 @@ void fault_handler(struct regs *r)
     /* Check if the fault number is between 0-31 */
     if (r->int_no < 32) {
         /* Display the description for the exception */
-        k_puts(exception_messages[r->int_no]);
-        k_puts(" Exception. System Frozen!\n");
-        __asm__ __volatile__ ("cli\nhlt");
+        kprintf(exception_messages[r->int_no]);
+        kprintf(" Exception. System Frozen!\n");
+        halt();
     }
 }
 
@@ -130,7 +130,7 @@ void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags)
 void idt_install()
 {
     /* Set up the special IDT pointer */
-    idtp.limit = (sizeof (struct idt_entry) * 256) - 1;
+    idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
     idtp.base = (uint32_t)&idt;
 
     memset(&idt, 0, sizeof(struct idt_entry) * 256);
@@ -170,6 +170,7 @@ void idt_install()
     idt_set_gate(31, (uint32_t)isr31, 0x08, 0x8E);
 
     /* Add new ISRs to the IDT here */
+    irq_install();
 
     /* defined in 'start.asm' */
     idt_load();

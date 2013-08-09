@@ -43,14 +43,35 @@ unsigned char kdbus[] = {
     0,  /* All other keys are undefined */
 };
 
-static void toggle_light(unsigned int light_code);
-static void toggle_scroll_lock_light(void);
-static void toggle_num_lock_light(void);
-static void toggle_caps_lock_light(void);
+
+static void toggle_light(unsigned int light_code)
+{
+    while (inportb(KBD_STATUS_REG) & KBD_STATUS_BUSY)
+        ;
+    outportb(KBD_DATA_REG, 0xED);
+    outportb(KBD_DATA_REG, light_code & 0xF);
+}
+
+/*
+static void toggle_scroll_lock_light(void)
+{
+    toggle_light(0x0);
+}
+static void toggle_num_lock_light(void)
+{
+    toggle_light(0x1);
+}
+*/
+
+static void toggle_caps_lock_light(void)
+{
+    toggle_light(0x2);
+}
 
 
 void keyboard_handler(struct regs *r)
 {
+    (void)r;    /* prevent 'unused parameter' warning */
     /* read from keyboard data register */
     unsigned char data = inportb(KBD_DATA_REG);
     unsigned char scancode = data & 0x7F;
@@ -70,25 +91,4 @@ void keyboard_handler(struct regs *r)
 void keyboard_install()
 {
     irq_install_handler(1, keyboard_handler);
-}
-
-static void toggle_scroll_lock_light(void)
-{
-    toggle_light(0x0);
-}
-static void toggle_num_lock_light(void)
-{
-    toggle_light(0x1);
-}
-static void toggle_caps_lock_light(void)
-{
-    toggle_light(0x2);
-}
-
-static void toggle_light(unsigned int light_code)
-{
-    while (inportb(KBD_STATUS_REG) & KBD_STATUS_BUSY)
-        ;
-    outportb(KBD_DATA_REG, 0xED);
-    outportb(KBD_DATA_REG, light_code & 0xF);
 }

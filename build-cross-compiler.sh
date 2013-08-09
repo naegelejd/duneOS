@@ -5,7 +5,7 @@
 # Install gcc 4.8 and 'select' it using macports
 # Build binutils, gcc and its dependencies:
 
-set -v
+set -vex
 
 build_dir=$HOME/src
 
