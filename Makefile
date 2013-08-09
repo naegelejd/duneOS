@@ -17,6 +17,7 @@ KERN_OBJS := $(addprefix $(OBJDIR)/,start.o kernel.o io.o gdt.o idt.o irq.o \
 	paging.o timer.o kb.o spkr.o rtc.o screen.o string.o print.o)
 
 KERNEL = kernel.bin
+ISO = dune32.iso
 
 QEMU = qemu-system-i386
 QARGS = -m 512
@@ -40,6 +41,12 @@ $(OBJDIR):
 
 run: $(KERNEL)
 	$(QEMU) $(QARGS) -kernel $<
+
+iso: $(KERNEL)
+	mkdir -p isodir/boot/grub
+	cp $< isodir/boot/
+	cp grub.cfg isodir/boot/grub/
+	grub-mkrescue -o $(ISO) isodir
 
 clean:
 	rm -f $(OBJDIR)/*.o $(KERNEL)
