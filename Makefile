@@ -13,8 +13,8 @@ OBJDIR = obj
 INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
 
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.asm)
-KERN_OBJS := $(addprefix $(OBJDIR)/,start.o kernel.o io.o gdt.o idt.o irq.o \
-	paging.o timer.o kb.o spkr.o rtc.o screen.o string.o print.o)
+KERN_OBJS := $(addprefix $(OBJDIR)/,start.o main.o io.o gdt.o idt.o irq.o \
+	mem.o paging.o timer.o kb.o spkr.o rtc.o screen.o string.o print.o)
 
 KERNEL = kernel.bin
 ISO = dune32.iso

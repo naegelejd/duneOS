@@ -3,12 +3,10 @@
 
 #include <stdint.h>
 
-int k_get_cursor ();
-void k_set_cursor (unsigned int offset);
-void kputc(char ch);
-char k_putchar(unsigned char ch, uint8_t attr);
-void k_clear_screen();
-void k_puts(char *message);
-void k_putnum(intptr_t);
+int kget_cursor();
+void kset_cursor (unsigned int offset);
+char kputc(char ch);
+void kcls();
+void kset_attr(uint8_t attr);
 
 #endif

@@ -5,20 +5,36 @@
 #include "kb.h"
 #include "rtc.h"
 
-extern uintptr_t start, code, data, bss, end;
+extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
 int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* double check that interrupts are disabled */
     /* cli(); */
 
-    k_clear_screen();
+    kcls();
     kprintf("Welcome to DuneOS...\n\n");
     if (mboot_magic == MULTIBOOT_BOOTLOADER_MAGIC) {
         kprintf("Multiboot Successful\n");
     } else {
         kprintf("Bad multiboot\n");
         return 1;
+    }
+
+    kprintf("Memory Map:\n");
+    multiboot_memory_map_t *mmap = (multiboot_memory_map_t*)mbinfo->mmap_addr;
+    while ((uintptr_t)mmap < mbinfo->mmap_addr + mbinfo->mmap_length) {
+        mmap = (multiboot_memory_map_t*) ((uintptr_t)mmap + mmap->size + sizeof(mmap->size));
+        kprintf("Base Addr: 0x%x, Length: 0x%x, Available: %s\n", (uint32_t)mmap->addr, (uint32_t)mmap->len,
+                (mmap->type == 1 ? "true" : "false"));
+    }
+
+
+    if (mbinfo->flags & MULTIBOOT_INFO_MEMORY) {
+        kprintf("Memory low: 0x%x\n", mbinfo->mem_lower);
+        kprintf("Memory high: 0x%x\n", mbinfo->mem_upper);
+    } else {
+        kprintf("No useful memory limits found\n");
     }
 
     gdt_install();
@@ -28,7 +44,9 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     irq_install();
     kprintf("IRQ handlers installed\n");
 
-    paging_install(&end);
+    mem_init(&g_end, mbinfo->mem_upper);
+
+    paging_install(&g_end);
     kprintf("Paging enabled\n");
 
     timer_install();
@@ -37,38 +55,17 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     sti();
 
-    uint32_t* page_fault = &end + 0x4000000;
-    kprintf("page fault? %u\n", *page_fault);
+    /* uint32_t* page_fault = 0xFFFFF0000; */
+    /* kprintf("page fault? 0x%x\n", *page_fault); */
+    /* kprintf("page fault? %u\n", *page_fault); */
 
     /*
-    if (mbinfo->flags & MULTIBOOT_INFO_MEMORY) {
-        kprintf("Memory low: 0x%x\n", mbinfo->mem_lower);
-        kprintf("Memory high: 0x%x\n", mbinfo->mem_upper);
-    } else {
-        kprintf("No useful memory limits found\n");
-    }
-
-    kprintf("Kernel size in bytes: %u\n", &end - &start);
-    kprintf("Start: 0x%x\n", &start);
-    kprintf("Code: 0x%x\n", &code);
-    kprintf("Data: 0x%x\n", &data);
-    kprintf("BSS: 0x%x\n", &bss);
-    kprintf("End: 0x%x\n", &end);
-    */
-
-    /*
-    char buf[15];
-    ksprintf(buf, "%s %d\n", "Hello", 42);
-    kprintf(buf);
-
-    kprintf("%04d\n", 42);
-    kprintf("%04d\n", 12345);
-    kprintf("%04x\n", 0xabcde);
-    kprintf("%04X\n", 0xFE);
-    kprintf("%4d\n", 42);
-    kprintf("%4d\n", 12345);
-    kprintf("%4X\n", 0xabcde);
-    kprintf("%4x\n", 0xFE);
+    kprintf("Kernel size in bytes: %u\n", &g_end - &g_start);
+    kprintf("Start: 0x%x\n", &g_start);
+    kprintf("Code: 0x%x\n", &g_code);
+    kprintf("Data: 0x%x\n", &g_data);
+    kprintf("BSS: 0x%x\n", &g_bss);
+    kprintf("End: 0x%x\n", &g_end);
     */
 
     /*
@@ -85,7 +82,6 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /*
     kprintf("%u\n", 1 / 0);
 
-    k_set_cursor(0);
     beep(2);
     delay(5000);
     reboot();

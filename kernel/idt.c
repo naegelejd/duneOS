@@ -170,7 +170,6 @@ void idt_install()
     idt_set_gate(31, (uint32_t)isr31, 0x08, 0x8E);
 
     /* Add new ISRs to the IDT here */
-    irq_install();
 
     /* defined in 'start.asm' */
     idt_load();

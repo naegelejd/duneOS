@@ -6,8 +6,10 @@
 #define VIDEO_ROWS      25
 #define VIDEO_COLS      80
 
-#define WHITE_ON_BLACK      0x0f
+#define WHITE_ON_BLACK      0x0F
+#define WHITE_ON_RED        0x4F
 #define RED_ON_BLACK        0x04
+#define RED_ON_WHITE        0xF4
 
 /* Screen device I/O ports */
 #define REG_SCREEN_CTRL     0x3D4
@@ -24,8 +26,74 @@
     7   LIGHT GREY  15  WHITE
 */
 
+/* global attribute for all chars printed to console */
+static uint8_t g_attr = WHITE_ON_BLACK;
+
+
 static unsigned int k_get_screen_offset(int col, int row);
 static unsigned int k_scroll_screen (unsigned int offset);
+
+
+char kputc(char ch)
+{
+    char* vidmem = (char *) VIDEO_ADDR;
+
+    int offset = kget_cursor();
+
+    if (ch == '\n') {
+        int row = offset / (VIDEO_COLS * 2);
+        offset = k_get_screen_offset(0, row + 1);
+    } else {
+        vidmem[offset] = ch;
+        vidmem[offset+1] = g_attr;
+        offset += 2;
+    }
+
+    offset = k_scroll_screen(offset);
+
+    kset_cursor(offset);
+
+    return ch;
+}
+
+int kget_cursor ()
+{
+    int offset = 0;
+    outportb(REG_SCREEN_CTRL, 14);     /* high byte of cursor offset */
+    offset = inportb(REG_SCREEN_DATA) << 8;
+    outportb(REG_SCREEN_CTRL, 15);     /* low  byte of cursor offset */
+    offset += inportb(REG_SCREEN_DATA);
+
+    /* return offset * sizeof character cell (2) */
+    return offset * 2;
+}
+
+void kset_cursor (unsigned int offset)
+{
+    offset /= 2;    /* convert from cell offset to char offset */
+    outportb(REG_SCREEN_CTRL, 14);
+    outportb(REG_SCREEN_DATA, (uint8_t)(offset >> 8));
+    outportb(REG_SCREEN_CTRL, 15);
+    outportb(REG_SCREEN_DATA, (uint8_t)(offset));
+}
+
+void kcls() // clear the entire text screen
+{
+    char *vidmem = (char *) VIDEO_ADDR;
+    unsigned int i = 0;
+    while (i < ((VIDEO_COLS * VIDEO_ROWS) * 2)) {
+        /* low byte = ASCII char, high byte = style */
+        vidmem[i++] = ' ';
+        vidmem[i++] = WHITE_ON_BLACK;
+    }
+    kset_cursor(0);
+}
+
+void kset_attr(uint8_t attr)
+{
+    g_attr = attr;
+}
+
 
 static unsigned int k_get_screen_offset(int col, int row)
 {
@@ -61,96 +129,3 @@ static unsigned int k_scroll_screen (unsigned int offset)
     return offset;
 }
 
-
-int k_get_cursor ()
-{
-    int offset = 0;
-    outportb(REG_SCREEN_CTRL, 14);     /* high byte of cursor offset */
-    offset = inportb(REG_SCREEN_DATA) << 8;
-    outportb(REG_SCREEN_CTRL, 15);     /* low  byte of cursor offset */
-    offset += inportb(REG_SCREEN_DATA);
-
-    /* return offset * sizeof character cell (2) */
-    return offset * 2;
-}
-
-void k_set_cursor (unsigned int offset)
-{
-    offset /= 2;    /* convert from cell offset to char offset */
-    outportb(REG_SCREEN_CTRL, 14);
-    outportb(REG_SCREEN_DATA, (uint8_t)(offset >> 8));
-    outportb(REG_SCREEN_CTRL, 15);
-    outportb(REG_SCREEN_DATA, (uint8_t)(offset));
-}
-
-void k_clear_screen() // clear the entire text screen
-{
-    char *vidmem = (char *) VIDEO_ADDR;
-    unsigned int i = 0;
-    while (i < ((VIDEO_COLS * VIDEO_ROWS) * 2)) {
-        /* low byte = ASCII char, high byte = style */
-        vidmem[i++] = ' ';
-        vidmem[i++] = WHITE_ON_BLACK;
-    }
-    k_set_cursor(0);
-}
-
-
-void kputc(char ch)
-{
-    k_putchar(ch, WHITE_ON_BLACK);
-}
-
-char k_putchar(unsigned char ch, uint8_t attr)
-{
-    char* vidmem = (char *) VIDEO_ADDR;
-    if (!attr) {
-        attr = WHITE_ON_BLACK;
-    }
-
-    int offset = k_get_cursor();
-
-    if (ch == '\n') {
-        int row = offset / (VIDEO_COLS * 2);
-        offset = k_get_screen_offset(0, row + 1);
-    } else {
-        if (ch < 0x20 || ch > 0x7f) {
-            attr = RED_ON_BLACK;
-        }
-        vidmem[offset] = ch;
-        vidmem[offset+1] = attr;
-        offset += 2;
-    }
-
-    offset = k_scroll_screen(offset);
-
-    k_set_cursor(offset);
-
-    return ch;
-}
-
-void k_puts(char *msg)
-{
-    char c;
-    while ((c = *msg++) != 0) {
-        k_putchar(c, WHITE_ON_BLACK);
-    }
-}
-
-void k_putnum(intptr_t num)
-{
-    int n = 0;
-    unsigned int d = 1;
-    while ((num / d) >= 10) {
-        d *= 10;
-    }
-    while (d != 0) {
-        int dgt = num / d;
-        num %= d;
-        d /= 10;
-        if (n || dgt > 0 || d == 0) {
-            k_putchar(dgt + (dgt < 10 ? '0' : 'a' - 10), 0);
-            ++n;
-        }
-    }
-}

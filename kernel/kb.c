@@ -83,7 +83,7 @@ void keyboard_handler(struct regs *r)
         }
     } else {
         /* key pressed */
-        k_putchar(kdbus[scancode], 0);
+        kputc(kdbus[scancode]);
     }
 }
 
