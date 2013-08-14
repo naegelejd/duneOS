@@ -4,20 +4,23 @@
 #include "io.h"
 #include "rtc.h"
 
-#define CURRENT_YEAR    2013
-
-#define CMOS_ADDR_REG   0x70
-#define CMOS_DATA_REG   0x71
-#define CMOS_STATUS_REGA    0x0A
-#define CMOS_STATUS_REGB    0x0B
-#define CMOS_STATUS_REGC    0x0C
-#define NMI_DISABLE     0x80
-#define NMI_ENABLE      0x0F
 
 #define BCD2BIN(bcd)    (((bcd) & 0xF) + ((bcd) >> 4) * 10)
 
+enum {
+    CMOS_STATUS_REGA = 0x0A,
+    CMOS_STATUS_REGB = 0x0B,
+    CMOS_STATUS_REGC = 0x0C,
+    NMI_ENABLE = 0x0F,
+    CMOS_ADDR_REG = 0x70,
+    CMOS_DATA_REG = 0x71,
+    NMI_DISABLE = 0x80,
+    CURRENT_YEAR = 2013
+};
+
 static char* months[] = {
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
 static char* days[] = {
@@ -145,15 +148,8 @@ void rtc_handler(struct regs *r)
 
 void rtc_install(void)
 {
-    irq_install_handler(8, rtc_handler);
-
-    /* wait until CMOS is not updating */
-    /*
-    uint8_t update_in_progress = 1;
-    while (update_in_progress) {
-        update_in_progress = read_cmos(CMOS_STATUS_REG);
-    }
-    */
+    cli();
+    irq_install_handler(IRQ_RTC, rtc_handler);
 
     /* determine if values are packed BCD or Binary */
     uint8_t regB = read_cmos(CMOS_STATUS_REGB);
@@ -161,8 +157,9 @@ void rtc_install(void)
         CMOS_BCD_VALUES = true;
     }
 
-    /* enable IRQ8 (RTC) */
-    /* interrupts must be disabled! */
-    uint8_t prev = read_cmos(CMOS_STATUS_REGB);     /* read CMOS register B */
-    write_cmos(CMOS_STATUS_REGB, prev | 0x40);      /* write previous value with bit 6 turned on */
+    /* enable IRQ8 (RTC) - interrupts must be disabled! */
+    /* read CMOS register B */
+    uint8_t prev = read_cmos(CMOS_STATUS_REGB);
+    /* write previous value with bit 6 turned on */
+    write_cmos(CMOS_STATUS_REGB, prev | 0x40);
 }

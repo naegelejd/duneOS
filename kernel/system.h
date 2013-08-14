@@ -4,10 +4,11 @@
 #include <stdint.h>
 
 
-void reboot();
-void halt();
-void cli();
-void sti();
+enum {
+    IRQ_TIMER = 0,
+    IRQ_KEYBOARD = 1,
+    IRQ_RTC = 8
+};
 
 struct regs
 {
@@ -17,12 +18,19 @@ struct regs
     uint32_t epi, cs, eflags, useresp, ss;  /* pushed by proc automatically */
 };
 
+typedef void (*irq_handler)(struct regs *r);
+
+
+void reboot();
+void halt();
+void cli();
+void sti();
+
 void gdt_install();
 
 void idt_install();
 void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags);
 
-typedef void (*irq_handler)(struct regs *r);
 void irq_install();
 void irq_install_handler(int irq, irq_handler handler);
 
@@ -32,7 +40,10 @@ void paging_install(uintptr_t end);
 
 void timer_install();
 void delay(unsigned int ticks);
+void set_timer_frequency(unsigned int hz);
+
 void beep(unsigned int ticks);
+void set_speaker_frequency(unsigned int hz);
 
 void keyboard_install();
 

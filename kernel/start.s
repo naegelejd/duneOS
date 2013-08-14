@@ -56,15 +56,15 @@ gdt_flush:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    jmp 0x08:flush2 ; 0x08 is offset to code segment (far jump)
-flush2:
+    jmp 0x08:.flush ; 0x08 is offset to code segment (far jump)
+.flush:
     ret
 
 ; extern void idt_load() in C
 ; this will load the IDT defined in 'idt.c'
-[global idt_load]
+[global load_idt]
 [extern idtp]
-idt_load:
+load_idt:
     lidt [idtp]
     ret
 
@@ -146,15 +146,19 @@ isr_common_stub:
     pop ds
     popa
     add esp, 8      ; Cleans up pushed error code and pushed ISR number
+    sti             ; re-enable interrupts
     iret            ; Pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
 
 
+; Macro for all IRQ handling code
+; Push ISR number, which is 32 + IDT number because
+; we remap IRQ 0-15 to IDT 32-47
 %macro irq_handle 1
 [global irq%1]
 irq%1:
     cli
     push byte 0
-    push byte %1
+    push byte 32+%1
     jmp irq_common_stub
 %endmacro
 
@@ -179,12 +183,12 @@ irq_handle 15    ; IRQ 14 (IDT 47)
 [extern default_irq_handler]
 ; calls default_irq_handler defined in 'irq.c'
 irq_common_stub:
-    pusha
+    pusha           ; push EDI, ESI, EBP, ESP, EBX, EDX, ECX, EAX
     push ds
     push es
     push fs
     push gs
-    mov ax, 0x10
+    mov ax, 0x10    ; load kernel data segment descriptor
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -192,15 +196,16 @@ irq_common_stub:
     mov eax, esp
     push eax
     mov eax, default_irq_handler
-    call eax
+    call eax        ; preserves EIP ?
     pop eax
     pop gs
     pop fs
     pop es
     pop ds
     popa
-    add esp, 8
-    iret
+    add esp, 8      ; clean up pushed error code and ISR number
+    sti             ; re-enable interrupts
+    iret            ; pop CS, EIP, EFLAGS, SS, and ESP
 
 
 section .bss

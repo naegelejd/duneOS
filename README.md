@@ -1,4 +1,4 @@
-duneOS
+DuneOS
 ======
 
 A simple UNIX-like operating system
@@ -11,14 +11,20 @@ The `build-cross-compiler.sh` script should help you obtain and build GNU binuti
 
 You'll also need `GNU make` and `nasm`.
 
-    make
-
-Run
----
-Obtain `qemu` then:
+Emulator
+--------
+To try DuneOS, obtain `QEMU` (specifically `qemu-system-i386`) then:
 
     make run
 
+CD-ROM
+------
+To make a bootable CD-ROM image, you'll need the tools packaged with GRUB, specifically
+`grub-mkrescue` and it's primary dependency `xorriso` (not available on Mac OS X).
+
+    make iso
+
+This generates an image called `Dune32.iso`, which will run on a VMWare or VirtualBox VM.
 
 References
 ----------

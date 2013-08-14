@@ -1,7 +1,16 @@
 #include <system.h>
-#include <io.h>
-#include <screen.h>
-#include "kb.h"
+#include "io.h"
+#include "screen.h"
+
+
+enum {
+    KBD_STATUS_BUSY = 0x02,
+    KBD_DATA_REG = 0x60,
+    KBD_CMD_REG = 0x64,
+    KBD_STATUS_REG = 0x64,
+    KBD_CPU_RESET_PIN = 0xFE
+};
+
 
 /* US Keyboard Layout lookup table */
 unsigned char kdbus[] = {
@@ -90,5 +99,5 @@ void keyboard_handler(struct regs *r)
 /* installs keyboard_handler into IRQ1 */
 void keyboard_install()
 {
-    irq_install_handler(1, keyboard_handler);
+    irq_install_handler(IRQ_KEYBOARD, keyboard_handler);
 }

@@ -2,7 +2,6 @@
 #include "multiboot.h"
 #include "screen.h"
 #include "print.h"
-#include "kb.h"
 #include "rtc.h"
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
@@ -68,15 +67,14 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("End: 0x%x\n", &g_end);
     */
 
-    /*
     struct tm dt;
     while (1) {
+        delay(500);
         datetime(&dt);
-        kprintf("%u:%u:%u %s %u, %u\n", dt.hour, dt.min, dt.sec,
+        kset_cursor(0, 58);
+        kprintf("%02u:%02u:%02u %s %02u, %04u\n", dt.hour, dt.min, dt.sec,
                 month_name(dt.month), dt.mday, dt.year);
-        delay(2000);
     }
-    */
 
     /* playing around */
     /*
@@ -87,26 +85,4 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     reboot();
     */
     return 0;
-}
-
-/* hack a hard reset by loading a bogus IDT */
-uint32_t no_idt[2] = {0, 0};
-void reboot()
-{
-    asm volatile ("lidt no_idt");
-}
-
-void halt()
-{
-    asm volatile ("cli\nhlt");
-}
-
-void cli()
-{
-    asm volatile ("cli");
-}
-
-void sti()
-{
-    asm volatile("sti");
 }

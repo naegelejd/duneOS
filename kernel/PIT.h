@@ -16,10 +16,10 @@
  * 0x43 - command
  *
  * Command bits:
- * 7-6: Counter # (0-2)
+ * 7-6: Channel # (0-2)
  * 5-4: RW (1=LSB, 2=MSB, 3=LSB then MSB)
  * 3-1: Mode
- * 0: BCD (0 = 16-bit counter, 1 = 4xBCD decade counter)
+ * 0: BCD (0 = 16-bit counter, 1 = 4 digit BCD counter)
  *
  * Modes:
  * 0: Interrupt on terminal count
@@ -30,11 +30,14 @@
  * 5: Hardware Strobe
  */
 
-#define PIT_FREQ_HZ     1193189
-#define PIT_DATA_REG0   0x40
-#define PIT_DATA_REG2   0x42
-#define PIT_SPKR_REG    0x61
-#define PIT_CMD_REG     0x43
+
+enum {
+    PIT_DATA_REG0 = 0x40,
+    PIT_DATA_REG2 = 0x42,
+    PIT_CMD_REG   = 0x43,
+    PIT_SPKR_REG  = 0x61,
+    PIT_FREQ_HZ   = 1193189
+};
 
 
 #endif

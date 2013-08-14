@@ -5,11 +5,11 @@
 
 /* See PIT.h for comments on the Programmable Interval Timer */
 
-void timer_phase(int hz)
+void set_timer_frequency(unsigned int hz)
 {
-    /* cmd = counter 0, LSB then MSB, Square Wave Mode, 16-bit counter */
+    /* cmd = channel 0, LSB then MSB, Square Wave Mode, 16-bit counter */
     uint8_t cmd = 0x36; 
-    int divisor = 1193180 / hz;
+    unsigned int divisor = PIT_FREQ_HZ / hz;
     outportb(PIT_CMD_REG, cmd);            /* Set command byte */
     outportb(PIT_DATA_REG0, divisor & 0xFF); /* Set low byte of divisor */
     outportb(PIT_DATA_REG0, divisor >> 8);   /* Set high byte of divisor */
@@ -35,8 +35,9 @@ void timer_handler(struct regs *r)
 /* installs timer_handler into IRQ0 */
 void timer_install()
 {
-    timer_phase(1000);
-    irq_install_handler(0, timer_handler);
+    /* set frequency to 1 KHz... 100 Hz is more accurate */
+    set_timer_frequency(1000);
+    irq_install_handler(IRQ_TIMER, timer_handler);
 }
 
 void delay(unsigned int ticks)
