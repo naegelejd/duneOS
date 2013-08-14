@@ -28,7 +28,13 @@ This generates an image called `Dune32.iso`, which will run on a VMWare or Virtu
 
 References
 ----------
+GeekOS: http://geekos.sourceforge.net/
+
+OS Dev.org: http://wiki.osdev.org/Main_Page
+
 Bran's Kernel Development Tutorial: http://www.osdever.net/bkerndev/Docs/title.htm
+
+JamesM's Kernel Development Tutorials: http://www.jamesmolloy.co.uk/tutorial_html/index.html
 
 Writing a Simple Operating System from Scratch (PDF): http://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 

@@ -148,7 +148,7 @@ void rtc_handler(struct regs *r)
 
 void rtc_install(void)
 {
-    cli();
+    kcli();
     irq_install_handler(IRQ_RTC, rtc_handler);
 
     /* determine if values are packed BCD or Binary */

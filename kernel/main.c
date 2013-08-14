@@ -1,15 +1,20 @@
 #include "system.h"
-#include "multiboot.h"
 #include "screen.h"
 #include "print.h"
+#include "string.h"
 #include "rtc.h"
+#include "mem.h"
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
 int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* double check that interrupts are disabled */
-    /* cli(); */
+    /* kcli(); */
+    KASSERT(&g_code < &g_data);
+    KASSERT(&g_data < &g_bss);
+    KASSERT(&g_bss < &g_end);
+    bss_init();
 
     kcls();
     kprintf("Welcome to DuneOS...\n\n");
@@ -20,22 +25,6 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
         return 1;
     }
 
-    kprintf("Memory Map:\n");
-    multiboot_memory_map_t *mmap = (multiboot_memory_map_t*)mbinfo->mmap_addr;
-    while ((uintptr_t)mmap < mbinfo->mmap_addr + mbinfo->mmap_length) {
-        mmap = (multiboot_memory_map_t*) ((uintptr_t)mmap + mmap->size + sizeof(mmap->size));
-        kprintf("Base Addr: 0x%x, Length: 0x%x, Available: %s\n", (uint32_t)mmap->addr, (uint32_t)mmap->len,
-                (mmap->type == 1 ? "true" : "false"));
-    }
-
-
-    if (mbinfo->flags & MULTIBOOT_INFO_MEMORY) {
-        kprintf("Memory low: 0x%x\n", mbinfo->mem_lower);
-        kprintf("Memory high: 0x%x\n", mbinfo->mem_upper);
-    } else {
-        kprintf("No useful memory limits found\n");
-    }
-
     gdt_install();
     kprintf("GDT installed\n");
     idt_install();
@@ -43,16 +32,23 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     irq_install();
     kprintf("IRQ handlers installed\n");
 
-    mem_init(&g_end, mbinfo->mem_upper);
+    mem_init(mbinfo);
 
-    paging_install(&g_end);
-    kprintf("Paging enabled\n");
+    /* paging_install(&g_end); */
+    /* kprintf("Paging enabled\n"); */
 
     timer_install();
     keyboard_install();
     rtc_install();
 
-    sti();
+    ksti();
+
+    char *tmp = "Hello World!\n";
+    char *new = malloc(strlen(tmp) + 1);
+    memcpy(new, tmp, strlen(tmp));
+    new[strlen(tmp)] = '\0';
+    kprintf("%s\n", new);
+    free(new);
 
     /* uint32_t* page_fault = 0xFFFFF0000; */
     /* kprintf("page fault? 0x%x\n", *page_fault); */
@@ -82,7 +78,7 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     beep(2);
     delay(5000);
-    reboot();
+    kreboot();
     */
     return 0;
 }

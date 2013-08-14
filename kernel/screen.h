@@ -1,5 +1,5 @@
-#ifndef SCREEN_H
-#define SCREEN_H
+#ifndef DUNE_SCREEN_H
+#define DUNE_SCREEN_H
 
 #include <stdint.h>
 
@@ -28,4 +28,4 @@ char kputc(char ch);
 void kcls();
 void kset_attr(uint8_t fg, uint8_t bg);
 
-#endif
+#endif /* DUNE_SCREEN_H */

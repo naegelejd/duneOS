@@ -111,7 +111,7 @@ void fault_handler(struct regs *r)
         /* Display the description for the exception */
         kset_attr(LGREEN, BLACK);
         kprintf("%s Exception. System Frozen!\n", exception_messages[r->int_no]);
-        halt();
+        khalt();
     }
 }
 

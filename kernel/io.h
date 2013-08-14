@@ -1,5 +1,5 @@
-#ifndef LOW_LEVEL_H
-#define LOW_LEVEL_H
+#ifndef DUNE_IO_H
+#define DUNE_IO_H
 
 #include <stdint.h>
 
@@ -29,4 +29,4 @@ void outportw (uint16_t port, uint16_t data);
  */
 void io_delay(void);
 
-#endif
+#endif /* DUNE_IO_H */

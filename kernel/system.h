@@ -1,7 +1,9 @@
-#ifndef SYSTEM_H
-#define SYSTEM_H
+#ifndef DUNE_SYSTEM_H
+#define DUNE_SYSTEM_H
 
-#include <stdint.h>
+#include "dune.h"
+#include "int.h"
+#include "multiboot.h"
 
 
 enum {
@@ -21,10 +23,8 @@ struct regs
 typedef void (*irq_handler)(struct regs *r);
 
 
-void reboot();
-void halt();
-void cli();
-void sti();
+void kreboot();
+void khalt();
 
 void gdt_install();
 
@@ -34,7 +34,8 @@ void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags);
 void irq_install();
 void irq_install_handler(int irq, irq_handler handler);
 
-void mem_init(uintptr_t start, uintptr_t end);
+void bss_init(void);
+void mem_init(struct multiboot_info*);
 
 void paging_install(uintptr_t end);
 
@@ -49,4 +50,4 @@ void keyboard_install();
 
 void rtc_install(void);
 
-#endif /* SYSTEM_H */
+#endif /* DUNE_SYSTEM_H */

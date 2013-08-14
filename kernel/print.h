@@ -1,5 +1,5 @@
-#ifndef PRINTK_H
-#define PRINTK_H
+#ifndef DUNE_PRINT_H
+#define DUNE_PRINT_H
 
 #include <stddef.h>
 #include <stdarg.h>
@@ -10,4 +10,4 @@ size_t kprintf(char *fmt, ...);
 /* construct a formatted string in buffer 's' */
 size_t ksprintf(char *s, char *fmt, ...);
 
-#endif /* PRINTK_H */
+#endif /* DUNE_PRINT_H */

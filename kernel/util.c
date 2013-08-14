@@ -3,22 +3,12 @@
 
 /* hack a hard reset by loading a bogus IDT */
 uint32_t no_idt[2] = {0, 0};
-void reboot()
+void kreboot()
 {
     asm volatile ("lidt no_idt");
 }
 
-void halt()
+void khalt()
 {
     asm volatile ("cli\nhlt");
-}
-
-void cli()
-{
-    asm volatile ("cli");
-}
-
-void sti()
-{
-    asm volatile("sti");
 }

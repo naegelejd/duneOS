@@ -1,5 +1,5 @@
-#ifndef PIT_H
-#define PIT_H
+#ifndef DUNE_PIT_H
+#define DUNE_PIT_H
 
 /*
  * Programmable Interval Timer (PIT 8253/8254) aka System Clock
@@ -40,4 +40,4 @@ enum {
 };
 
 
-#endif
+#endif /* DUNE_PIT_H */

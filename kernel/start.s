@@ -32,10 +32,16 @@ multiboot:
 [global g_start]
 g_start:
     ;mov esp, stack_top  ; set up stack pointer
-    mov esp, 0x7FFF  ; set up stack pointer
+    mov esp, 0x7FFFF  ; set up stack pointer
     ;push esp   ; push stack pointer
     push eax    ; push header magic
     push ebx    ; push header pointer
+    cli
+    cli
+    sti
+    sti
+    sti
+    cli
     cli
     call main
 
@@ -207,6 +213,13 @@ irq_common_stub:
     sti             ; re-enable interrupts
     iret            ; pop CS, EIP, EFLAGS, SS, and ESP
 
+
+; return contents of EFLAGS register
+[global get_eflags]
+get_eflags:
+    pushfd      ; push eflags
+    pop eax     ; pop contents into eax
+    ret
 
 section .bss
     resb 8192   ; reserve 8K

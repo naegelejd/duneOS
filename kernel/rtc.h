@@ -1,5 +1,5 @@
-#ifndef RTC_H
-#define RTC_H
+#ifndef DUNE_RTC_H
+#define DUNE_RTC_H
 
 #include <stdint.h>
 
@@ -24,4 +24,4 @@ char* month_name(uint8_t mon);
 
 void datetime(struct tm *tm_out);
 
-#endif
+#endif /* DUNE_RTC_H */
