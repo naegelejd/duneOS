@@ -33,6 +33,10 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("IRQ handlers installed\n");
 
     mem_init(mbinfo);
+    kprintf("Memory manager and Heap initialized\n");
+
+    tss_init();
+    kprintf("TSS installed\n");
 
     /* paging_install(&g_end); */
     /* kprintf("Paging enabled\n"); */

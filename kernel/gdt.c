@@ -1,84 +1,72 @@
 #include "system.h"
 #include "string.h"
-
-/*
- * Segment Descriptor
- *
- * Notes on Direction/Conforming (DC) bit:
- * Code segment:
- *   1: code in this segment can be executed in lower privelege levels
- *   0: code in this segment can only be accessed by ring # in descriptor
- * Data segment:
- *   1: segment grows down
- *   0: segment grows up
- */
-struct seg_descr {
-    uint16_t limit_low;
-
-    uint16_t base_low;
-    uint8_t base_middle;
-
-    /* access byte */
-    unsigned accessed:1;    /* toggled by CPU */
-    unsigned rw: 1;         /* code: readable? data: writable? */
-    unsigned dc: 1;         /* direction/conforming */
-    unsigned exec: 1;       /* executable segment? */
-    unsigned system: 1;     /* always 1 */
-    unsigned ring: 2;       /* Ring 0-3 */
-    unsigned present: 1;    /* present? 1=Yes */
-
-    unsigned limit_high: 4;
-
-    /* flags nibble */
-    unsigned avail: 1;      /* populated? 0=no, 1=yes */
-    unsigned reserved: 1;   /* always 0 */
-    unsigned opsize: 1;     /* 0=16-bit, 1=32-bit */
-    unsigned granularity: 1;/* 0=1 byte, 1=4KB */
-
-    uint8_t base_high;
-} __attribute__((packed));
-
-
-enum { NUM_GDT_ENTRIES = 8 };
-
-/* special GDT pointer */
-struct gdt_ptr {
-    uint16_t limit;     /* max bytes used by GDT */
-    uint32_t base;      /* base address of GDT */
-} __attribute__((packed));
+#include "gdt.h"
 
 /* GDT and special global GDT pointer */
 struct seg_descr g_gdt[NUM_GDT_ENTRIES];
+unsigned int g_num_gdt_entries = 0;
+
 struct gdt_ptr g_gdt_ptr;
 
-/* defined in 'start.asm' */
-extern void gdt_flush();
 
-void init_code_seg_descr(struct seg_descr *descr, uintptr_t base, uintptr_t limit, unsigned ring)
+struct seg_descr* new_seg_descr(void)
+{
+    KASSERT(g_num_gdt_entries < NUM_GDT_ENTRIES);
+
+    struct seg_descr* sd = &g_gdt[g_num_gdt_entries];
+    g_num_gdt_entries++;
+    return sd;
+}
+
+uint16_t gdt_selector(struct seg_descr* sd)
+{
+    /*
+     * (# of segment descriptors from GDT start)
+     *                    *
+     *   (sizeof segment descriptor in bytes)
+     */
+    return (sd - &g_gdt[0]) * sizeof(struct seg_descr);
+}
+
+uint8_t seg_descr_type(struct seg_descr* sd)
+{
+    uint8_t type = *((uint8_t*)sd + 5);
+    return type;
+}
+
+uint8_t seg_descr_access(struct seg_descr* sd)
+{
+    uint8_t access = *((uint8_t*)sd + 6);
+    return access;
+}
+
+void init_code_seg_descr(struct seg_descr *descr, uintptr_t base, uintptr_t limit, unsigned dpl)
 {
     descr->base_low = (base & 0xFFFF);
     descr->base_middle = (base >> 16) & 0xFF;
     descr->base_high = (base >> 24) & 0xFF;
 
     descr->limit_low = (limit & 0xFFFF);
-    descr->limit_high = (limit >> 16) & 0x0F;
-
-    descr->present =  1;
-    descr->ring = ring;
-    descr->system = 1;
 
     descr->accessed = 0;
     descr->rw = 1;          /* readable */
-    descr->dc = 0;          /* only executable in ring 0 */
+    descr->dc = 0;          /* non-conforming (only executable in Ring 0) */
     descr->exec = 1;        /* executable */
 
-    descr->granularity = 1;
-    descr->opsize = 1;
+    descr->system = 1;      /* code seg, not TSS */
+
+    descr->dpl = dpl;
+    descr->present =  1;
+
+    descr->limit_high = (limit >> 16) & 0x0F;
+
+    descr->avail = 0;       /* no longer available */
     descr->reserved = 0;
-    descr->avail = 0;
+    descr->opsize = 1;      /* 32-bit operands */
+    descr->granularity = 1; /* 4KB */
 }
 
-void init_data_seg_descr(struct seg_descr *descr, uintptr_t base, uintptr_t limit, unsigned ring)
+void init_data_seg_descr(struct seg_descr *descr, uintptr_t base, uintptr_t limit, unsigned dpl)
 {
     descr->base_low = (base & 0xFFFF);
     descr->base_middle = (base >> 16) & 0xFF;
@@ -87,20 +75,24 @@ void init_data_seg_descr(struct seg_descr *descr, uintptr_t base, uintptr_t limi
     descr->limit_low = (limit & 0xFFFF);
     descr->limit_high = (limit >> 16) & 0xFF;
 
-    descr->present =  1;
-    descr->ring = ring;
-    descr->system = 1;
-
     descr->accessed = 0;
     descr->rw = 1;          /* writable */
-    descr->dc = 0;          /* only executable in ring 0 */
+    descr->dc = 0;          /* segment grows UP */
     descr->exec = 0;        /* NOT executable */
 
-    descr->granularity = 1;
-    descr->opsize = 1;
+    descr->system = 1;      /* data seg, not TSS */
+
+    descr->dpl = dpl;
+    descr->present =  1;
+
+    descr->avail = 0;       /* no longer available */
     descr->reserved = 0;
-    descr->avail = 0;
+    descr->opsize = 1;      /* 32-bit operands */
+    descr->granularity = 1; /* 4KB granularity */
 }
+
+/* defined in 'start.asm' */
+extern void gdt_flush();
 
 void gdt_install()
 {
@@ -111,21 +103,27 @@ void gdt_install()
     g_gdt_ptr.base = (uint32_t)&g_gdt;
 
     /* NULL descriptor */
-    memset(&g_gdt[0], 0, sizeof(struct seg_descr));
+    struct seg_descr* null_descr = new_seg_descr();
+    KASSERT(gdt_selector(null_descr) == 0x0);
+    memset(null_descr, 0, sizeof(struct seg_descr));
 
-    /* Code segment, Base addr: 0, Limit: 4GB */
-    init_code_seg_descr(&g_gdt[1], 0, 0xFFFFFFFF, 0);
+    /* Code segment, Base addr: 0, Limit: 2^20 - 1 4KB pages */
+    struct seg_descr* cs_descr = new_seg_descr();
+    KASSERT(gdt_selector(cs_descr) == 0x8);
+    init_code_seg_descr(cs_descr, 0, 0xFFFFF, 0);
 
     uint8_t *tmp = (uint8_t*)&g_gdt[1] + 5;
-    KASSERT(*tmp == 0x9A);
-    KASSERT(*(tmp+1) == 0xCF);
+    KASSERT(seg_descr_type(&g_gdt[1]) == 0x9A);
+    KASSERT(seg_descr_access(&g_gdt[1]) == 0xCF);
 
-    /* Data segment, Base addr: 0, Limit: 4GB */
-    init_data_seg_descr(&g_gdt[2], 0, 0xFFFFFFFF, 0);
+    /* Data segment, Base addr: 0, Limit: 2^20 - 1 4KB pages */
+    struct seg_descr* ds_descr = new_seg_descr();
+    KASSERT(gdt_selector(ds_descr) == 0x10);
+    init_data_seg_descr(ds_descr, 0, 0xFFFFF, 0);
 
     tmp = (uint8_t*)&g_gdt[2] + 5;
-    KASSERT(*tmp == 0x92);
-    KASSERT(*(tmp+1) == 0xCF);
+    KASSERT(seg_descr_type(&g_gdt[2]) == 0x92);
+    KASSERT(seg_descr_access(&g_gdt[2]) == 0xCF);
 
     /* Flush out the old GDT and install new */
     gdt_flush();

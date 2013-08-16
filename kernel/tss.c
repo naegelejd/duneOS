@@ -1,63 +1,61 @@
 #include "system.h"
+#include "string.h"
+#include "gdt.h"
+#include "tss.h"
 
 
-struct tss {
-    uint16_t link;
-    uint16_t reserved0;
+static struct tss g_tss;
 
-    /* stack pointers/selectors */
-    uint32_t esp0;
-    uint16_t ss0;
-    uint16_t reserved1;
-    uint32_t esp1;
-    uint16_t ss1;
-    uint16_t reserved2;
-    uint32_t esp2;
-    uint16_t ss2;
-    uint16_t reserved3;
+void init_tss_seg_descr(struct seg_descr* descr, struct tss* tss)
+{
+    uintptr_t base = (uintptr_t)tss;
+    uint32_t limit = sizeof(struct tss);
 
-    /* page directory reg */
-    uint32_t cr3;
+    descr->base_low = (base & 0xFFFF);
+    descr->base_middle = (base >> 16) & 0xFF;
+    descr->base_high = (base >> 24) & 0xFF;
 
-    /* general purpose regs */
-    uint32_t eip;
-    uint32_t eflags;
-    uint32_t eax;
-    uint32_t ebx;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t esp;
-    uint32_t ebp;
-    uint32_t esi;
-    uint32_t edi;
+    descr->limit_low = (limit & 0xFFFF);
 
-    /* segment selectors */
-    uint16_t es;
-    uint16_t reserved4;
-    uint16_t cs;
-    uint16_t reserved5;
-    uint16_t ss;
-    uint16_t reserved6;
-    uint16_t ds;
-    uint16_t reserved7;
-    uint16_t fs;
-    uint16_t reserved8;
-    uint16_t gs;
-    uint16_t reserved9;
+    /* the type nibble is 0x9 (32-bit available TSS) */
+    descr->accessed = 1;
+    descr->rw = 0;          /* busy bit - NOT BUSY! on init */
+    descr->dc = 0;
+    descr->exec = 1;
 
-    /* GDT selector for the LDT descriptor */
-    uint16_t ldt;
-    uint16_t reserved10;
+    descr->system = 0;      /* tss seg, not code/data */
 
-    /* unsigned debugTrap : 1; */
-    /* unsigned reserved11 : 15; */
-    uint16_t reserved11;
+    descr->dpl = 0;         /* Ring 0 */
+    descr->present = 1;
 
-    /* pointer to IO port permissions map for this task */
-    uint16_t io_map_ptr;
-};
+    descr->limit_high = (limit >> 16) & 0x0F;
+
+    descr->avail = 0;        /* no longer available */
+    descr->reserved = 0;
+    descr->opsize = 0;      /* must be 0 in TSS */
+    descr->granularity = 0; /* 1-byte granularity! */
+}
 
 void tss_init(void)
 {
+    struct seg_descr* tss_descr = new_seg_descr();
 
+    memset(&g_tss, 0, sizeof(struct tss));
+    init_tss_seg_descr(tss_descr, &g_tss);
+
+    KASSERT(seg_descr_type(tss_descr) == 0x89);
+    KASSERT(seg_descr_access(tss_descr) == 0x00);
+
+    /* I know this is descriptor 3 in the GDT
+     * 0: null descriptor
+     * 1: ring 0 code descriptor
+     * 2: ring 0 data descriptor
+     * 3: TSS descriptor
+     * so the TSS selector is 3 * (8 byte segment descriptor) = 0x18
+     */
+    uint16_t tss_sel = gdt_selector(tss_descr);
+    KASSERT(tss_sel = 0x18);
+
+    /* load the TSS selector */
+    asm volatile("ltr %0" : : "a" (tss_sel));
 }
