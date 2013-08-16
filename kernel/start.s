@@ -51,11 +51,11 @@ g_start:
     jmp .hang
 
 ; extern void gdt_flush() in C
-; this will set up segment registers then far jump 
+; this will set up segment registers then far jump
 [global gdt_flush]  ; make linkable
-[extern gp]         ; defined in 'gdt.c'
+[extern g_gdt_ptr]      ; defined in 'gdt.c'
 gdt_flush:
-    lgdt [gp]       ; load our GDT pointer from 'gdt.c'
+    lgdt [g_gdt_ptr]    ; load our GDT pointer from 'gdt.c'
     mov ax, 0x10    ; 0x10 is offset into GDT for data segment
     mov ds, ax
     mov es, ax
