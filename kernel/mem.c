@@ -79,6 +79,49 @@ static uintptr_t addr_from_page(page_t *page)
     return index << PAGE_POWER;
 }
 
+static page_t* freelist_get_page()
+{
+    KASSERT(g_free_page_count > 0);
+    KASSERT(g_free_page_head != NULL);
+
+    page_t* page = g_free_page_head;
+
+    /* update flag */
+    page->flags = PAGE_ALLOC;
+
+    /* if we just emptied the freelist, NULL the head/tail */
+    if (g_free_page_head == g_free_page_tail) {
+        g_free_page_head = NULL;
+        g_free_page_tail = NULL;
+    }
+
+    /* move freelist head forward a page */
+    g_free_page_head = page->next;
+    g_free_page_count--;
+
+    return page;
+}
+
+static void freelist_add_page(page_t* page)
+{
+    /* update flag */
+    page->flags = PAGE_AVAIL;
+
+    /* if the list head is NULL, set it to this page */
+    if (!g_free_page_head) {
+        g_free_page_head = page;
+    }
+
+    /* if the tail is NOT null, link it to the new page */
+    if (g_free_page_tail != NULL) {
+        g_free_page_tail->next = page;
+    }
+
+    g_free_page_tail = page;
+
+    g_free_page_count++;
+}
+
 static void mark_page_range(uintptr_t start, uintptr_t end, uint32_t flags)
 {
     char *flagname;
@@ -115,8 +158,7 @@ static void mark_page_range(uintptr_t start, uintptr_t end, uint32_t flags)
         page->flags = flags;
 
         if (flags & PAGE_AVAIL) {
-            /* TODO: append to freelist */
-            g_free_page_count++;
+            freelist_add_page(page);
         } else {
             page->next = NULL;
         }
@@ -196,12 +238,8 @@ void* alloc_page(void)
     bool iflag = beg_int_atomic();
 
     if (g_free_page_count > 0) {
-        /* TODO: remove page from free page list */
-        page_t* page = g_free_page_head;
-        g_free_page_head = page->next;
-        KASSERT(page->flags & (~PAGE_ALLOC));
-        page->flags |= PAGE_ALLOC;
-        g_free_page_count--;
+        page_t* page = freelist_get_page();
+        KASSERT(page->flags & PAGE_ALLOC);
         addr = (void*)addr_from_page(page);
     }
 
@@ -219,11 +257,7 @@ void free_page(void* page_addr)
 
     page_t* page = page_from_addr(addr);
     KASSERT(page->flags & PAGE_ALLOC);
-
-    page->flags &= ~PAGE_ALLOC;
-
-    /* TODO: append to page freelist */
-    g_free_page_count++;
+    freelist_add_page(page);
 
     end_int_atomic(iflag);
 }
