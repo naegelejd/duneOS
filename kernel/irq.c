@@ -2,7 +2,7 @@
 #include <system.h>
 #include <io.h>
 
-#define NUM_IRQ_HANDLERS    16
+enum { NUM_IRQ_HANDLERS = 16 };
 
 /* These special IRQs point to the special IRQ handler
  * rather than the default 'fault_handler'
@@ -41,7 +41,7 @@ extern void irq13();
 extern void irq14();
 extern void irq15();
 
-irq_handler irq_routines[NUM_IRQ_HANDLERS] = { 
+irq_handler irq_routines[NUM_IRQ_HANDLERS] = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
@@ -66,7 +66,7 @@ void irq_remap(void)
     outportb(0x21, 0x20); /* remap PICM to 0x20 (32 decimal) */
     outportb(0xA1, 0x28); /* remap PICS to 0x28 (40 decimal) */
 
-    outportb(0x21, 0x04); /* IRQ2 -> connection to slave */ 
+    outportb(0x21, 0x04); /* IRQ2 -> connection to slave */
     outportb(0xA1, 0x02);
 
     outportb(0x21, 0x01); /* write ICW4 to PICM, we are gonna write commands to PICM */
@@ -80,24 +80,22 @@ void irq_install(void)
 {
     irq_remap();
 
-    uint8_t sel = 0x08;     /* code segment */
-    uint8_t flags = 1 << 7 | 0 << 5 | 0xE;  /* present, ring 0 (supervisor), 0xE */
-    idt_set_gate(32, (uint32_t)irq0, sel, flags);
-    idt_set_gate(33, (uint32_t)irq1, sel, flags);
-    idt_set_gate(34, (uint32_t)irq2, sel, flags);
-    idt_set_gate(35, (uint32_t)irq3, sel, flags);
-    idt_set_gate(36, (uint32_t)irq4, sel, flags);
-    idt_set_gate(37, (uint32_t)irq5, sel, flags);
-    idt_set_gate(38, (uint32_t)irq6, sel, flags);
-    idt_set_gate(39, (uint32_t)irq7, sel, flags);
-    idt_set_gate(40, (uint32_t)irq8, sel, flags);
-    idt_set_gate(41, (uint32_t)irq9, sel, flags);
-    idt_set_gate(42, (uint32_t)irq10, sel, flags);
-    idt_set_gate(43, (uint32_t)irq11, sel, flags);
-    idt_set_gate(44, (uint32_t)irq12, sel, flags);
-    idt_set_gate(45, (uint32_t)irq13, sel, flags);
-    idt_set_gate(46, (uint32_t)irq14, sel, flags);
-    idt_set_gate(47, (uint32_t)irq15, sel, flags);
+    idt_set_int_gate(32, (uintptr_t)irq0, 0);
+    idt_set_int_gate(33, (uintptr_t)irq1, 0);
+    idt_set_int_gate(34, (uintptr_t)irq2, 0);
+    idt_set_int_gate(35, (uintptr_t)irq3, 0);
+    idt_set_int_gate(36, (uintptr_t)irq4, 0);
+    idt_set_int_gate(37, (uintptr_t)irq5, 0);
+    idt_set_int_gate(38, (uintptr_t)irq6, 0);
+    idt_set_int_gate(39, (uintptr_t)irq7, 0);
+    idt_set_int_gate(40, (uintptr_t)irq8, 0);
+    idt_set_int_gate(41, (uintptr_t)irq9, 0);
+    idt_set_int_gate(42, (uintptr_t)irq10, 0);
+    idt_set_int_gate(43, (uintptr_t)irq11, 0);
+    idt_set_int_gate(44, (uintptr_t)irq12, 0);
+    idt_set_int_gate(45, (uintptr_t)irq13, 0);
+    idt_set_int_gate(46, (uintptr_t)irq14, 0);
+    idt_set_int_gate(47, (uintptr_t)irq15, 0);
 }
 
 /*

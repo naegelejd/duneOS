@@ -8,7 +8,7 @@
 void set_timer_frequency(unsigned int hz)
 {
     /* cmd = channel 0, LSB then MSB, Square Wave Mode, 16-bit counter */
-    uint8_t cmd = 0x36; 
+    uint8_t cmd = 0x36;
     unsigned int divisor = PIT_FREQ_HZ / hz;
     outportb(PIT_CMD_REG, cmd);            /* Set command byte */
     outportb(PIT_DATA_REG0, divisor & 0xFF); /* Set low byte of divisor */

@@ -1,38 +1,8 @@
-#include <stdint.h>
-#include <system.h>
+#include "system.h"
 #include "screen.h"
 #include "string.h"
-#include "print.h"
+#include "idt.h"
 
-/*
- * IDT flag bits:
- *
- * 7: Segment is present (1=Yes)
- * 6-5: Which Ring (0-3)
- * 4-0: Always 01110 (0x0E)
- */
-
-/* entry in IDT */
-struct idt_entry {
-    uint16_t base_low;
-    uint16_t sel;       /* kernel segment goes here */
-    uint8_t always0;    /* always set to 0 */
-    uint8_t flags;
-    uint16_t base_high;
-} __attribute__((packed));
-
-struct idt_ptr {
-    uint16_t limit;
-    uint32_t base;
-} __attribute__((packed));
-
-/* Our IDT has 256 entries. We only use the first 32,
- * but the rest serve as a safety net. When an undefined
- * IDT entry is encountered, or if the 'presence' bit is
- * cleared, a "Unhandled Interrupt" exception will be thrown.
- */
-struct idt_entry idt[256];
-struct idt_ptr idtp;
 
 /* defined in start.s */
 extern void isr0();
@@ -68,7 +38,7 @@ extern void isr29();
 extern void isr30();
 extern void isr31();
 
-char *exception_messages[] =
+static char *exception_messages[] =
 {
     "Division By Zero",
     "Debug",
@@ -104,6 +74,15 @@ char *exception_messages[] =
     "Reserved"
 };
 
+/* Our IDT has 256 entries. We only use the first 32,
+ * but the rest serve as a safety net. When an undefined
+ * IDT entry is encountered, or if the 'presence' bit is
+ * cleared, a "Unhandled Interrupt" exception will be thrown.
+ */
+union idt_descr g_idt[NUM_IDT_ENTRIES];
+struct idt_ptr g_idt_ptr;
+
+
 void fault_handler(struct regs *r)
 {
     /* Check if the fault number is between 0-31 */
@@ -115,13 +94,18 @@ void fault_handler(struct regs *r)
     }
 }
 
-void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags)
+void idt_set_int_gate(uint8_t num, uintptr_t base, unsigned dpl)
 {
-    idt[num].base_low = base & 0xFFFF;
-    idt[num].sel = sel;
-    idt[num].always0 = 0;
-    idt[num].flags = flags;
-    idt[num].base_high = (base >> 16) & 0xFFFF;
+    KASSERT((uintptr_t)&g_idt[num].intg == (uintptr_t)&g_idt[num]);
+    struct int_gate* intg = &(g_idt[num].intg);
+
+    intg->base_low = base & 0xFFFF;
+    intg->sel = CODE_SEG_SELECTOR;
+    intg->reserved = 0;
+    intg->sig = 0x70;    /* always */
+    intg->dpl = dpl;     /* descriptor protection level */
+    intg->present = 1;
+    intg->base_high = (base >> 16) & 0xFFFF;
 }
 
 /* defined in start.s */
@@ -130,47 +114,47 @@ extern void load_idt();
 /* install the IDT */
 void idt_install()
 {
+    KASSERT(sizeof(union idt_descr) == sizeof(struct int_gate));
+
     /* Set up the special IDT pointer */
-    idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
-    idtp.base = (uint32_t)&idt;
+    g_idt_ptr.limit = sizeof(union idt_descr) * NUM_IDT_ENTRIES - 1;
+    g_idt_ptr.base = (uint32_t)&g_idt;
 
-    memset(&idt, 0, sizeof(struct idt_entry) * 256);
+    memset(&g_idt, 0, sizeof(union idt_descr) * NUM_IDT_ENTRIES);
 
-    uint8_t sel = 0x08;     /* code segment */
-    uint8_t flags = 1 << 7 | 0 << 5 | 0xE;  /* present, ring 0 (supervisor), 0xE */
     /* Install first 32 defined ISRs */
-    idt_set_gate(0, (uint32_t)isr0, sel, flags);
-    idt_set_gate(1, (uint32_t)isr1, sel, flags);
-    idt_set_gate(2, (uint32_t)isr2, sel, flags);
-    idt_set_gate(3, (uint32_t)isr3, sel, flags);
-    idt_set_gate(4, (uint32_t)isr4, sel, flags);
-    idt_set_gate(5, (uint32_t)isr5, sel, flags);
-    idt_set_gate(6, (uint32_t)isr6, sel, flags);
-    idt_set_gate(7, (uint32_t)isr7, sel, flags);
-    idt_set_gate(8, (uint32_t)isr8, sel, flags);
-    idt_set_gate(9, (uint32_t)isr9, sel, flags);
-    idt_set_gate(10, (uint32_t)isr10, sel, flags);
-    idt_set_gate(11, (uint32_t)isr11, sel, flags);
-    idt_set_gate(12, (uint32_t)isr12, sel, flags);
-    idt_set_gate(13, (uint32_t)isr13, sel, flags);
-    idt_set_gate(14, (uint32_t)isr14, sel, flags);
-    idt_set_gate(15, (uint32_t)isr15, sel, flags);
-    idt_set_gate(16, (uint32_t)isr16, sel, flags);
-    idt_set_gate(17, (uint32_t)isr17, sel, flags);
-    idt_set_gate(18, (uint32_t)isr18, sel, flags);
-    idt_set_gate(19, (uint32_t)isr19, sel, flags);
-    idt_set_gate(20, (uint32_t)isr20, sel, flags);
-    idt_set_gate(21, (uint32_t)isr21, sel, flags);
-    idt_set_gate(22, (uint32_t)isr22, sel, flags);
-    idt_set_gate(23, (uint32_t)isr23, sel, flags);
-    idt_set_gate(24, (uint32_t)isr24, sel, flags);
-    idt_set_gate(25, (uint32_t)isr25, sel, flags);
-    idt_set_gate(26, (uint32_t)isr26, sel, flags);
-    idt_set_gate(27, (uint32_t)isr27, sel, flags);
-    idt_set_gate(28, (uint32_t)isr28, sel, flags);
-    idt_set_gate(29, (uint32_t)isr29, sel, flags);
-    idt_set_gate(30, (uint32_t)isr30, sel, flags);
-    idt_set_gate(31, (uint32_t)isr31, sel, flags);
+    idt_set_int_gate(0, (uintptr_t)isr0, 0);
+    idt_set_int_gate(1, (uintptr_t)isr1, 0);
+    idt_set_int_gate(2, (uintptr_t)isr2, 0);
+    idt_set_int_gate(3, (uintptr_t)isr3, 0);
+    idt_set_int_gate(4, (uintptr_t)isr4, 0);
+    idt_set_int_gate(5, (uintptr_t)isr5, 0);
+    idt_set_int_gate(6, (uintptr_t)isr6, 0);
+    idt_set_int_gate(7, (uintptr_t)isr7, 0);
+    idt_set_int_gate(8, (uintptr_t)isr8, 0);
+    idt_set_int_gate(9, (uintptr_t)isr9, 0);
+    idt_set_int_gate(10, (uintptr_t)isr10, 0);
+    idt_set_int_gate(11, (uintptr_t)isr11, 0);
+    idt_set_int_gate(12, (uintptr_t)isr12, 0);
+    idt_set_int_gate(13, (uintptr_t)isr13, 0);
+    idt_set_int_gate(14, (uintptr_t)isr14, 0);
+    idt_set_int_gate(15, (uintptr_t)isr15, 0);
+    idt_set_int_gate(16, (uintptr_t)isr16, 0);
+    idt_set_int_gate(17, (uintptr_t)isr17, 0);
+    idt_set_int_gate(18, (uintptr_t)isr18, 0);
+    idt_set_int_gate(19, (uintptr_t)isr19, 0);
+    idt_set_int_gate(20, (uintptr_t)isr20, 0);
+    idt_set_int_gate(21, (uintptr_t)isr21, 0);
+    idt_set_int_gate(22, (uintptr_t)isr22, 0);
+    idt_set_int_gate(23, (uintptr_t)isr23, 0);
+    idt_set_int_gate(24, (uintptr_t)isr24, 0);
+    idt_set_int_gate(25, (uintptr_t)isr25, 0);
+    idt_set_int_gate(26, (uintptr_t)isr26, 0);
+    idt_set_int_gate(27, (uintptr_t)isr27, 0);
+    idt_set_int_gate(28, (uintptr_t)isr28, 0);
+    idt_set_int_gate(29, (uintptr_t)isr29, 0);
+    idt_set_int_gate(30, (uintptr_t)isr30, 0);
+    idt_set_int_gate(31, (uintptr_t)isr31, 0);
 
     /* Add new ISRs to the IDT here */
 

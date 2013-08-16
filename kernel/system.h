@@ -30,7 +30,7 @@ void gdt_install();
 void tss_init(void);
 
 void idt_install();
-void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags);
+void idt_set_int_gate(uint8_t num, uintptr_t base, unsigned dpl);
 
 void irq_install();
 void irq_install_handler(int irq, irq_handler handler);

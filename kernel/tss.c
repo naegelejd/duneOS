@@ -54,7 +54,7 @@ void tss_init(void)
      * so the TSS selector is 3 * (8 byte segment descriptor) = 0x18
      */
     uint16_t tss_sel = gdt_selector(tss_descr);
-    KASSERT(tss_sel = 0x18);
+    KASSERT(tss_sel = TSS_SELECTOR);
 
     /* load the TSS selector */
     asm volatile("ltr %0" : : "a" (tss_sel));

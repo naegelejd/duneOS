@@ -104,12 +104,12 @@ void gdt_install()
 
     /* NULL descriptor */
     struct seg_descr* null_descr = new_seg_descr();
-    KASSERT(gdt_selector(null_descr) == 0x0);
+    KASSERT(gdt_selector(null_descr) == NULL_SEG_SELECTOR);
     memset(null_descr, 0, sizeof(struct seg_descr));
 
     /* Code segment, Base addr: 0, Limit: 2^20 - 1 4KB pages */
     struct seg_descr* cs_descr = new_seg_descr();
-    KASSERT(gdt_selector(cs_descr) == 0x8);
+    KASSERT(gdt_selector(cs_descr) == CODE_SEG_SELECTOR);
     init_code_seg_descr(cs_descr, 0, 0xFFFFF, 0);
 
     uint8_t *tmp = (uint8_t*)&g_gdt[1] + 5;
@@ -118,7 +118,7 @@ void gdt_install()
 
     /* Data segment, Base addr: 0, Limit: 2^20 - 1 4KB pages */
     struct seg_descr* ds_descr = new_seg_descr();
-    KASSERT(gdt_selector(ds_descr) == 0x10);
+    KASSERT(gdt_selector(ds_descr) == DATA_SEG_SELECTOR);
     init_data_seg_descr(ds_descr, 0, 0xFFFFF, 0);
 
     tmp = (uint8_t*)&g_gdt[2] + 5;

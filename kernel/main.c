@@ -7,14 +7,15 @@
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
-int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
+void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* double check that interrupts are disabled */
     /* kcli(); */
     KASSERT(&g_code < &g_data);
     KASSERT(&g_data < &g_bss);
     KASSERT(&g_bss < &g_end);
-    bss_init();
+
+    bss_init();     /* zero all static data */
 
     kcls();
     kprintf("Welcome to DuneOS...\n\n");
@@ -84,5 +85,4 @@ int main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     delay(5000);
     kreboot();
     */
-    return 0;
 }

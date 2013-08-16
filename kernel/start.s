@@ -37,12 +37,6 @@ g_start:
     push eax    ; push header magic
     push ebx    ; push header pointer
     cli
-    cli
-    sti
-    sti
-    sti
-    cli
-    cli
     call main
 
     cli
@@ -69,9 +63,9 @@ gdt_flush:
 ; extern void idt_load() in C
 ; this will load the IDT defined in 'idt.c'
 [global load_idt]
-[extern idtp]
+[extern g_idt_ptr]
 load_idt:
-    lidt [idtp]
+    lidt [g_idt_ptr]
     ret
 
 

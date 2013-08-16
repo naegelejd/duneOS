@@ -40,8 +40,14 @@ struct seg_descr {
     uint8_t base_high;
 } __attribute__((packed));
 
-
 enum { NUM_GDT_ENTRIES = 8 };
+
+enum {
+    NULL_SEG_SELECTOR = 0x0,
+    CODE_SEG_SELECTOR = 0x08,
+    DATA_SEG_SELECTOR = 0x10,
+    TSS_SELECTOR = 0x18
+};
 
 /* special GDT pointer */
 struct gdt_ptr {
