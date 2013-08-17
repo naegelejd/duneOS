@@ -1,6 +1,7 @@
 #ifndef DUNE_IDT_H
 #define DUNE_IDT_H
 
+#include "int.h"
 #include "gdt.h"    /* for selector constants */
 
 struct int_gate {
@@ -26,6 +27,10 @@ struct idt_ptr {
 
 
 enum { NUM_IDT_ENTRIES = 256 };
+
+
+void idt_install();
+void idt_set_int_gate(uint8_t num, uintptr_t base, unsigned dpl);
 
 
 #endif /* DUNE_IDT_H */

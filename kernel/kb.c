@@ -1,15 +1,7 @@
-#include <system.h>
+#include "irq.h"
 #include "io.h"
 #include "screen.h"
-
-
-enum {
-    KBD_STATUS_BUSY = 0x02,
-    KBD_DATA_REG = 0x60,
-    KBD_CMD_REG = 0x64,
-    KBD_STATUS_REG = 0x64,
-    KBD_CPU_RESET_PIN = 0xFE
-};
+#include "kb.h"
 
 
 /* US Keyboard Layout lookup table */

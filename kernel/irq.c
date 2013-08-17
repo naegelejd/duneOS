@@ -1,6 +1,6 @@
-#include <stddef.h>
-#include <system.h>
-#include <io.h>
+#include "io.h"
+#include "idt.h"
+#include "irq.h"
 
 enum { NUM_IRQ_HANDLERS = 16 };
 

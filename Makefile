@@ -3,7 +3,7 @@ CCHOME = $(HOME)/opt/cross
 CC = $(CCHOME)/bin/i386-elf-gcc
 NASM = nasm
 
-CFLAGS = -DDUNE -std=gnu99 -O0 -Wall -Wextra -pedantic -nostdlib -nostdinc -ffreestanding -finline-functions
+CFLAGS = -DDUNE -std=gnu99 -O0 -Wall -Wextra -pedantic -nostdlib -nostdinc -ffreestanding -finline-functions -Werror
 NFLAGS = -felf
 LFLAGS = #-lgcc
 

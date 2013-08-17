@@ -2,15 +2,21 @@
 bits 32
 align 4
 
+; Definitions
+KERNEL_CS equ 1 << 3
+KERNEL_DS equ 2 << 3
+
 MBOOT_PAGE_ALIGN    equ 0x1
 MBOOT_MEM_INFO      equ 0x2
 MBOOT_USE_GFX       equ 0x4
-; Don't need Multiboot AOUT Kludge for an ELF kernel
 MBOOT_HDR_MAGIC     equ 0x1BADB002
 MBOOT_HDR_FLAGS     equ MBOOT_PAGE_ALIGN | MBOOT_MEM_INFO
 MBOOT_CHECKSUM      equ -(MBOOT_HDR_MAGIC + MBOOT_HDR_FLAGS)
 
+
 ; start of kernel image:
+; Multiboot header
+; note: you don't need Multiboot AOUT Kludge for an ELF kernel
 multiboot:
     dd MBOOT_HDR_MAGIC
     dd MBOOT_HDR_FLAGS
@@ -44,28 +50,27 @@ g_start:
     hlt
     jmp .hang
 
-; extern void gdt_flush() in C
+; Load the 6-byte GDT pointer from the address passed as a parameter
 ; this will set up segment registers then far jump
 [global gdt_flush]  ; make linkable
-[extern g_gdt_ptr]      ; defined in 'gdt.c'
 gdt_flush:
-    lgdt [g_gdt_ptr]    ; load our GDT pointer from 'gdt.c'
-    mov ax, 0x10    ; 0x10 is offset into GDT for data segment
+    mov eax, [esp+4]
+    lgdt [eax]      ; load our GDT pointer from 'gdt.c'
+    mov ax, 0x10    ; offset into GDT for kernel data segment
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    jmp 0x08:.flush ; 0x08 is offset to code segment (far jump)
+    jmp 0x08:.flush ; offset into GDT for kernel code segment (far jump)
 .flush:
     ret
 
-; extern void idt_load() in C
-; this will load the IDT defined in 'idt.c'
-[global load_idt]
-[extern g_idt_ptr]
-load_idt:
-    lidt [g_idt_ptr]
+; Load the 6-byte IDT pointer from the address passed as parameter
+[global idt_flush]
+idt_flush:
+    mov eax, [esp+4]
+    lidt [eax]
     ret
 
 

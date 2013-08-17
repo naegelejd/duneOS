@@ -1,4 +1,3 @@
-#include "system.h"
 #include "screen.h"
 #include "string.h"
 #include "idt.h"
@@ -79,8 +78,8 @@ static char *exception_messages[] =
  * IDT entry is encountered, or if the 'presence' bit is
  * cleared, a "Unhandled Interrupt" exception will be thrown.
  */
-union idt_descr g_idt[NUM_IDT_ENTRIES];
-struct idt_ptr g_idt_ptr;
+static union idt_descr g_idt[NUM_IDT_ENTRIES];
+static struct idt_ptr g_idt_ptr;
 
 
 void fault_handler(struct regs *r)
@@ -109,7 +108,7 @@ void idt_set_int_gate(uint8_t num, uintptr_t base, unsigned dpl)
 }
 
 /* defined in start.s */
-extern void load_idt();
+extern void idt_flush(void*);
 
 /* install the IDT */
 void idt_install()
@@ -159,5 +158,5 @@ void idt_install()
     /* Add new ISRs to the IDT here */
 
     /* defined in 'start.s' */
-    load_idt();
+    idt_flush(&g_idt_ptr);
 }

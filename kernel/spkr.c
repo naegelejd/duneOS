@@ -1,6 +1,7 @@
-#include <io.h>
-#include <system.h>
+#include "io.h"
+#include "timer.h"
 #include "PIT.h"
+#include "spkr.h"
 
 /* See PIT.h for comments on the Programmable Interval Timer */
 

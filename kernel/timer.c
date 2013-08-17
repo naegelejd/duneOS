@@ -1,7 +1,7 @@
-#include <system.h>
-#include <io.h>
-#include <screen.h>
+#include "irq.h"
+#include "io.h"
 #include "PIT.h"
+#include "timer.h"
 
 /* See PIT.h for comments on the Programmable Interval Timer */
 

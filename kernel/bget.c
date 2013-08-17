@@ -586,7 +586,7 @@ void *bget(requested_size)
 
     assert(size > 0);
 
-    if (size < SizeQ) { 	      /* Need at least room for the */
+    if ((unsigned long)size < SizeQ) { 	      /* Need at least room for the */
 	size = SizeQ;		      /*    queue links.  */
     }
 #ifdef SizeQuant
@@ -638,7 +638,7 @@ void *bget(requested_size)
 		   buffer if enough room remains for a header plus the minimum
 		   quantum of allocation. */
 
-		if ((b->bh.bsize - size) > (SizeQ + (sizeof(struct bhead)))) {
+		if ((b->bh.bsize - (unsigned long)size) > (SizeQ + (sizeof(struct bhead)))) {
 		    struct bhead *ba, *bn;
 
 		    ba = BH(((char *) b) + (b->bh.bsize - size));
@@ -707,7 +707,7 @@ void *bget(requested_size)
     /* Don't give up yet -- look in the reserve supply. */
 
     if (acqfcn != NULL) {
-	if (size > exp_incr - sizeof(struct bhead)) {
+	if ((unsigned long)size > exp_incr - sizeof(struct bhead)) {
 
 	    /* Request	is  too  large	to  fit in a single expansion
 	       block.  Try to satisy it by a direct buffer acquisition. */
@@ -948,7 +948,7 @@ void brel(buf)
 	pool blocks are the same size.	*/
 
     if (relfcn != NULL &&
-	((bufsize) b->bh.bsize) == (pool_len - sizeof(struct bhead))) {
+	((unsigned long)b->bh.bsize) == (pool_len - sizeof(struct bhead))) {
 
 	assert(b->bh.prevfree == 0);
 	assert(BH((char *) b + b->bh.bsize)->bsize == ESent);

@@ -2,6 +2,7 @@
 #define DUNE_ASSERT_H
 
 #include "dune.h"
+#include "util.h"
 
 #ifndef NDEBUG
 

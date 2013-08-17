@@ -1,9 +1,14 @@
-#include "system.h"
+#include "util.h"
 #include "screen.h"
-#include "print.h"
 #include "string.h"
-#include "rtc.h"
+#include "gdt.h"
+#include "idt.h"
+#include "irq.h"
+#include "tss.h"
 #include "mem.h"
+#include "kb.h"
+#include "rtc.h"
+#include "timer.h"
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
@@ -23,7 +28,7 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
         kprintf("Multiboot Successful\n");
     } else {
         kprintf("Bad multiboot\n");
-        return 1;
+        return;
     }
 
     gdt_install();
@@ -54,6 +59,8 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     new[strlen(tmp)] = '\0';
     kprintf("%s\n", new);
     free(new);
+
+    print_esp();
 
     /* uint32_t* page_fault = 0xFFFFF0000; */
     /* kprintf("page fault? 0x%x\n", *page_fault); */

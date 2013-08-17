@@ -7,6 +7,5 @@
 
 #include "assert.h"
 #include "print.h"
-#include "system.h"
 
 #endif /* DUNE_H */

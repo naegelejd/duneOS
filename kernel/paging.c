@@ -1,6 +1,4 @@
-#include "system.h"
-#include "print.h"
-
+#include "paging.h"
 
 void paging_install(uintptr_t end)
 {

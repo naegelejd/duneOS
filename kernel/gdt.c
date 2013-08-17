@@ -1,10 +1,9 @@
-#include "system.h"
 #include "string.h"
 #include "gdt.h"
 
 /* GDT and special global GDT pointer */
-struct seg_descr g_gdt[NUM_GDT_ENTRIES];
-unsigned int g_num_gdt_entries = 0;
+static struct seg_descr g_gdt[NUM_GDT_ENTRIES];
+static unsigned int g_num_gdt_entries = 0;
 
 struct gdt_ptr g_gdt_ptr;
 
@@ -92,7 +91,7 @@ void init_data_seg_descr(struct seg_descr *descr, uintptr_t base, uintptr_t limi
 }
 
 /* defined in 'start.asm' */
-extern void gdt_flush();
+extern void gdt_flush(void*);
 
 void gdt_install()
 {
@@ -112,7 +111,6 @@ void gdt_install()
     KASSERT(gdt_selector(cs_descr) == CODE_SEG_SELECTOR);
     init_code_seg_descr(cs_descr, 0, 0xFFFFF, 0);
 
-    uint8_t *tmp = (uint8_t*)&g_gdt[1] + 5;
     KASSERT(seg_descr_type(&g_gdt[1]) == 0x9A);
     KASSERT(seg_descr_access(&g_gdt[1]) == 0xCF);
 
@@ -121,10 +119,9 @@ void gdt_install()
     KASSERT(gdt_selector(ds_descr) == DATA_SEG_SELECTOR);
     init_data_seg_descr(ds_descr, 0, 0xFFFFF, 0);
 
-    tmp = (uint8_t*)&g_gdt[2] + 5;
     KASSERT(seg_descr_type(&g_gdt[2]) == 0x92);
     KASSERT(seg_descr_access(&g_gdt[2]) == 0xCF);
 
     /* Flush out the old GDT and install new */
-    gdt_flush();
+    gdt_flush(&g_gdt_ptr);
 }

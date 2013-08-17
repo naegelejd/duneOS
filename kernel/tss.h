@@ -57,4 +57,8 @@ struct tss {
     uint16_t io_map_ptr;
 };
 
+
+void tss_init(void);
+
+
 #endif /* DUNE_TSS_H */

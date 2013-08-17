@@ -1,5 +1,5 @@
 #ifndef DUNE_GDT_H
-#define DUNE_HDT_H
+#define DUNE_GDT_H
 
 /*
  * Segment Descriptor
@@ -60,5 +60,7 @@ struct seg_descr* new_seg_descr(void);
 uint16_t gdt_selector(struct seg_descr*);
 uint8_t seg_descr_type(struct seg_descr*);
 uint8_t seg_descr_access(struct seg_descr*);
+
+void gdt_install();
 
 #endif /* DUNE_GDT_H */
