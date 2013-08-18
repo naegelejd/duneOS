@@ -4,41 +4,13 @@
 
 
 /* defined in start.s */
-extern void isr0();
-extern void isr1();
-extern void isr2();
-extern void isr3();
-extern void isr4();
-extern void isr5();
-extern void isr6();
-extern void isr7();
-extern void isr8();
-extern void isr9();
-extern void isr10();
-extern void isr11();
-extern void isr12();
-extern void isr13();
-extern void isr14();
-extern void isr15();
-extern void isr16();
-extern void isr17();
-extern void isr18();
-extern void isr19();
-extern void isr20();
-extern void isr21();
-extern void isr22();
-extern void isr23();
-extern void isr24();
-extern void isr25();
-extern void isr26();
-extern void isr27();
-extern void isr28();
-extern void isr29();
-extern void isr30();
-extern void isr31();
+extern void isr0(), isr1(), isr2(), isr3(), isr4(), isr5(), isr6(), isr7();
+extern void isr8(), isr9(), isr10(), isr11(), isr12(), isr13(), isr14(), isr15();
+extern void isr16(), isr17(), isr18(), isr19(), isr20(), isr21(), isr22(), isr23();
+extern void isr24(), isr25(), isr26(), isr27(), isr28(), isr29(), isr30(), isr31();
+extern void isr128();
 
-static char *exception_messages[] =
-{
+static char *exception_messages[] = {
     "Division By Zero",
     "Debug",
     "Non Maskable Interrupt",
@@ -73,6 +45,9 @@ static char *exception_messages[] =
     "Reserved"
 };
 
+/* empty array of custom interrupt handlers */
+static int_handler_t g_handlers[NUM_IDT_ENTRIES];
+
 /* Our IDT has 256 entries. We only use the first 32,
  * but the rest serve as a safety net. When an undefined
  * IDT entry is encountered, or if the 'presence' bit is
@@ -81,17 +56,6 @@ static char *exception_messages[] =
 static union idt_descr g_idt[NUM_IDT_ENTRIES];
 static struct idt_ptr g_idt_ptr;
 
-
-void fault_handler(struct regs *r)
-{
-    /* Check if the fault number is between 0-31 */
-    if (r->int_no < 32) {
-        /* Display the description for the exception */
-        kset_attr(LGREEN, BLACK);
-        kprintf("%s Exception. System Frozen!\n", exception_messages[r->int_no]);
-        khalt();
-    }
-}
 
 void idt_set_int_gate(uint8_t num, uintptr_t base, unsigned dpl)
 {
@@ -107,7 +71,7 @@ void idt_set_int_gate(uint8_t num, uintptr_t base, unsigned dpl)
     intg->base_high = (base >> 16) & 0xFFFF;
 }
 
-/* defined in start.s */
+/* defined in assembly */
 extern void idt_flush(void*);
 
 /* install the IDT */
@@ -115,8 +79,19 @@ void idt_install()
 {
     KASSERT(sizeof(union idt_descr) == sizeof(struct int_gate));
 
+    /* TODO: calculate offsets to each ISR then loop over
+     * each ISR address and add them to IDT... rather than
+     * explicitly referencing each ISR symbol */
+    char *isr7addr = (char*)(uintptr_t)isr7;    /* pedantic */
+    char *isr8addr = (char*)(uintptr_t)isr8;    /* pedantic */
+    char *isr9addr = (char*)(uintptr_t)isr9;    /* pedantic */
+    uintptr_t isr_no_err_size = isr8addr - isr7addr;
+    uintptr_t isr_err_size = isr9addr - isr8addr;
+    kprintf("Sizeof ISR with... no error code: %u, error code: %u\n",
+            isr_no_err_size, isr_err_size);
+
     /* Set up the special IDT pointer */
-    g_idt_ptr.limit = sizeof(union idt_descr) * NUM_IDT_ENTRIES - 1;
+    g_idt_ptr.limit = sizeof(union idt_descr) * NUM_IDT_ENTRIES;
     g_idt_ptr.base = (uint32_t)&g_idt;
 
     memset(&g_idt, 0, sizeof(union idt_descr) * NUM_IDT_ENTRIES);
@@ -155,8 +130,36 @@ void idt_install()
     idt_set_int_gate(30, (uintptr_t)isr30, 0);
     idt_set_int_gate(31, (uintptr_t)isr31, 0);
 
-    /* Add new ISRs to the IDT here */
+    idt_set_int_gate(128, (uintptr_t)isr128, 3);
+
 
     /* defined in 'start.s' */
     idt_flush(&g_idt_ptr);
+}
+
+void int_install_handler(int interrupt, int_handler_t handler)
+{
+    KASSERT((interrupt < NUM_IDT_ENTRIES) && (interrupt >= 0));
+    g_handlers[interrupt] = handler;
+}
+/* Each interrupt handler calls this function (assembly),
+ * which, in turn, either calls a specific handler, or
+ * just prints an exception message and halts the CPU
+ */
+void default_int_handler(struct regs *r)
+{
+    int_handler_t handler = g_handlers[r->int_no];
+    if (!handler) {
+        if (r->int_no < NUM_INT_EXCEPTIONS) {
+            /* Display the description for the exception */
+            kset_attr(LGREEN, BLACK);
+            kprintf("%s Exception. System Frozen!\n", exception_messages[r->int_no]);
+        } else {
+            kset_attr(MAGENTA, BLACK);
+            kprintf("Unknown Interrupt 0x%x. System Frozen!\n", r->int_no);
+        }
+        khalt();
+    } else {
+        handler(r);
+    }
 }

@@ -19,6 +19,8 @@ struct regs {
     uint32_t epi, cs, eflags, useresp, ss;
 };
 
+typedef void (*int_handler_t)(struct regs *r);
+
 bool interrupts_enabled(void);
 
 bool beg_int_atomic(void);

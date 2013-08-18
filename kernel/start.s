@@ -78,8 +78,8 @@ idt_flush:
 [global isr%1]
 isr%1:
     cli
-    push byte 0
-    push byte %1
+    push dword 0
+    push dword %1
     jmp isr_common_stub
 %endmacro
 
@@ -87,7 +87,9 @@ isr%1:
 [global isr%1]
 isr%1:
     cli
-    push byte %1
+    nop
+    nop
+    push dword %1
     jmp isr_common_stub
 %endmacro
 
@@ -111,21 +113,17 @@ isr_no_err 15   ; Unknown Interrupt Exception
 isr_no_err 16   ; Coprocessor Fault Exception
 isr_no_err 17   ; Alignment Check Exception
 isr_no_err 18   ; Machine Check Exception
-isr_no_err 19   ; Reserved
-isr_no_err 20   ; Reserved
-isr_no_err 21   ; Reserved
-isr_no_err 22   ; Reserved
-isr_no_err 23   ; Reserved
-isr_no_err 24   ; Reserved
-isr_no_err 25   ; Reserved
-isr_no_err 26   ; Reserved
-isr_no_err 27   ; Reserved
-isr_no_err 28   ; Reserved
-isr_no_err 29   ; Reserved
-isr_no_err 30   ; Reserved
-isr_no_err 31   ; Reserved
 
-[extern fault_handler]
+; Interrupts 19-31 are Intel Reserved and have no error code
+; Interrupts 32-255 have no error code
+%assign intno 19
+%rep (256 - 19)
+isr_no_err intno
+%assign intno intno + 1
+%endrep
+
+
+[extern default_int_handler]
 ; Common ISR stub
 ; Save processor state, set up for kernel mode segments,
 ; call C-level fault handler, restore processor state
@@ -142,7 +140,7 @@ isr_common_stub:
     mov gs, ax
     mov eax, esp    ; Push the stack
     push eax
-    mov eax, fault_handler
+    mov eax, default_int_handler
     call eax        ; A special call, preserves the 'eip' register
     pop eax
     pop gs

@@ -2,8 +2,6 @@
 #include "idt.h"
 #include "irq.h"
 
-enum { NUM_IRQ_HANDLERS = 16 };
-
 /* These special IRQs point to the special IRQ handler
  * rather than the default 'fault_handler'
  *
@@ -24,34 +22,10 @@ enum { NUM_IRQ_HANDLERS = 16 };
  *  14       Primary ATA Hard Disk
  *  15       Secondary ATA Hard Disk
  */
-extern void irq0();
-extern void irq1();
-extern void irq2();
-extern void irq3();
-extern void irq4();
-extern void irq5();
-extern void irq6();
-extern void irq7();
-extern void irq8();
-extern void irq9();
-extern void irq10();
-extern void irq11();
-extern void irq12();
-extern void irq13();
-extern void irq14();
-extern void irq15();
+extern void irq0(), irq1(), irq2(), irq3(), irq4(), irq5(), irq6(), irq7();
+extern void irq8(), irq9(), irq10(), irq11(), irq12(), irq13(), irq14(), irq15();
 
-irq_handler irq_routines[NUM_IRQ_HANDLERS] = {
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-};
-
-void irq_install_handler(int irq, irq_handler handler)
-{
-    if ((irq < NUM_IRQ_HANDLERS) && (irq >= 0)) {
-        irq_routines[irq] = handler;
-    }
-}
+static int_handler_t g_isrs[NUM_IRQ_HANDLERS];
 
 /* Normally, IRQ 0-8 are mapped to IDT entries 8-15.
  * These conflict with the IDT entries already installed.
@@ -63,8 +37,8 @@ void irq_remap(void)
     outportb(0x20, 0x11); /* write ICW1 to PICM, we are gonna write commands to PICM */
     outportb(0xA0, 0x11); /* write ICW1 to PICS, we are gonna write commands to PICS */
 
-    outportb(0x21, 0x20); /* remap PICM to 0x20 (32 decimal) */
-    outportb(0xA1, 0x28); /* remap PICS to 0x28 (40 decimal) */
+    outportb(0x21, IRQ_ISR_START); /* remap PICM to 0x20 (32 decimal) */
+    outportb(0xA1, IRQ_ISR_START + 8); /* remap PICS to 0x28 (40 decimal) */
 
     outportb(0x21, 0x04); /* IRQ2 -> connection to slave */
     outportb(0xA1, 0x02);
@@ -80,45 +54,44 @@ void irq_install(void)
 {
     irq_remap();
 
-    idt_set_int_gate(32, (uintptr_t)irq0, 0);
-    idt_set_int_gate(33, (uintptr_t)irq1, 0);
-    idt_set_int_gate(34, (uintptr_t)irq2, 0);
-    idt_set_int_gate(35, (uintptr_t)irq3, 0);
-    idt_set_int_gate(36, (uintptr_t)irq4, 0);
-    idt_set_int_gate(37, (uintptr_t)irq5, 0);
-    idt_set_int_gate(38, (uintptr_t)irq6, 0);
-    idt_set_int_gate(39, (uintptr_t)irq7, 0);
-    idt_set_int_gate(40, (uintptr_t)irq8, 0);
-    idt_set_int_gate(41, (uintptr_t)irq9, 0);
-    idt_set_int_gate(42, (uintptr_t)irq10, 0);
-    idt_set_int_gate(43, (uintptr_t)irq11, 0);
-    idt_set_int_gate(44, (uintptr_t)irq12, 0);
-    idt_set_int_gate(45, (uintptr_t)irq13, 0);
-    idt_set_int_gate(46, (uintptr_t)irq14, 0);
-    idt_set_int_gate(47, (uintptr_t)irq15, 0);
+    idt_set_int_gate(IRQ_ISR_START, (uintptr_t)irq0, 0);
+    idt_set_int_gate(IRQ_ISR_START + 1, (uintptr_t)irq1, 0);
+    idt_set_int_gate(IRQ_ISR_START + 2, (uintptr_t)irq2, 0);
+    idt_set_int_gate(IRQ_ISR_START + 3, (uintptr_t)irq3, 0);
+    idt_set_int_gate(IRQ_ISR_START + 4, (uintptr_t)irq4, 0);
+    idt_set_int_gate(IRQ_ISR_START + 5, (uintptr_t)irq5, 0);
+    idt_set_int_gate(IRQ_ISR_START + 6, (uintptr_t)irq6, 0);
+    idt_set_int_gate(IRQ_ISR_START + 7, (uintptr_t)irq7, 0);
+    idt_set_int_gate(IRQ_ISR_START + 8, (uintptr_t)irq8, 0);
+    idt_set_int_gate(IRQ_ISR_START + 9, (uintptr_t)irq9, 0);
+    idt_set_int_gate(IRQ_ISR_START + 10, (uintptr_t)irq10, 0);
+    idt_set_int_gate(IRQ_ISR_START + 11, (uintptr_t)irq11, 0);
+    idt_set_int_gate(IRQ_ISR_START + 12, (uintptr_t)irq12, 0);
+    idt_set_int_gate(IRQ_ISR_START + 13, (uintptr_t)irq13, 0);
+    idt_set_int_gate(IRQ_ISR_START + 14, (uintptr_t)irq14, 0);
+    idt_set_int_gate(IRQ_ISR_START + 15, (uintptr_t)irq15, 0);
+}
+
+void irq_install_handler(int irq, int_handler_t handler)
+{
+    KASSERT((irq < NUM_IRQ_HANDLERS) && (irq >= 0));
+    g_isrs[irq] = handler;
 }
 
 /*
- * Each IRQ ISR calls this handler (from irq_common_stub)
- * rather than the 'fault_handler' defined in 'isrs.c'.
+ * Each IRQ ISR calls this handler (from irq_common_stub),
+ * which, in turn, will call IRQ-specific handlers
  */
 void default_irq_handler(struct regs *r)
 {
     /* empty handler pointer */
-    irq_handler handler;
+    int_handler_t handler = NULL;
 
-    /* run custom handler if installed */
-    int irq = r->int_no - 32;
-    if ((irq < NUM_IRQ_HANDLERS) && (irq >= 0)) {
-        handler = irq_routines[irq];
-    } else {
-        handler = NULL;
-    }
-
-    /* execute IRQ-specific handler if one exists */
-    if (handler) {
-        handler(r);
-    }
+    /* run IRQ-specific handler if installed */
+    int irq = r->int_no - IRQ_ISR_START;
+    KASSERT((irq < NUM_IRQ_HANDLERS) && (irq >= 0));
+    handler = g_isrs[irq];
+    handler(r);
 
     /* if the IDT entry invoked is greater than 40
      * (meaning IRQ8-15), then send 'End of Interrupt' to

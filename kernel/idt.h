@@ -27,6 +27,7 @@ struct idt_ptr {
 
 
 enum { NUM_IDT_ENTRIES = 256 };
+enum { NUM_INT_EXCEPTIONS = 32 };
 
 
 void idt_install();

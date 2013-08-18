@@ -3,7 +3,7 @@ CCHOME = $(HOME)/opt/cross
 CC = $(CCHOME)/bin/i386-elf-gcc
 NASM = nasm
 
-CFLAGS = -DDUNE -std=gnu99 -O0 -Wall -Wextra -pedantic -nostdlib -nostdinc -ffreestanding -finline-functions -Werror
+CFLAGS = -DDUNE -std=gnu99 -Wall -Wextra -pedantic -nostdlib -nostdinc -ffreestanding -finline-functions -Werror
 NFLAGS = -felf
 LFLAGS = #-lgcc
 
@@ -28,7 +28,6 @@ QARGS = -m 32
 all: $(KERNEL)
 
 $(KERNEL): $(KERN_OBJS)
-	#$(CC) $(CFLAGS) -nostdlib -o $@ -T $(KERNDIR)/link.ld $^
 	$(CC) $(CFLAGS) -o $@ -T $(KERNDIR)/link.ld $^ $(LFLAGS)
 
 $(OBJDIR)/%.o: $(KERNDIR)/%.c
