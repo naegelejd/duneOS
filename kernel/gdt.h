@@ -1,6 +1,9 @@
 #ifndef DUNE_GDT_H
 #define DUNE_GDT_H
 
+#include "dune.h"
+#include "seg.h"
+
 /*
  * Segment Descriptor
  *
@@ -41,13 +44,6 @@ struct seg_descr {
 } __attribute__((packed));
 
 enum { NUM_GDT_ENTRIES = 8 };
-
-enum {
-    NULL_SEG_SELECTOR = 0x0,
-    CODE_SEG_SELECTOR = 0x08,
-    DATA_SEG_SELECTOR = 0x10,
-    TSS_SELECTOR = 0x18
-};
 
 /* special GDT pointer */
 struct gdt_ptr {

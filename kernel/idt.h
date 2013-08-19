@@ -2,7 +2,7 @@
 #define DUNE_IDT_H
 
 #include "int.h"
-#include "gdt.h"    /* for selector constants */
+#include "seg.h"    /* for selector constants */
 
 struct int_gate {
     uint16_t base_low;
