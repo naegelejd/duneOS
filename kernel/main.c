@@ -4,8 +4,9 @@
 #include "gdt.h"
 #include "idt.h"
 #include "irq.h"
-#include "tss.h"
 #include "mem.h"
+#include "thread.h"
+#include "tss.h"
 #include "kb.h"
 #include "rtc.h"
 #include "timer.h"
@@ -40,6 +41,10 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     mem_init(mbinfo);
     kprintf("Memory manager and Heap initialized\n");
+
+    scheduler_init();
+    kprintf("Scheduler initialized\n");
+    dump_all_threads_list();
 
     tss_init();
     kprintf("TSS installed\n");

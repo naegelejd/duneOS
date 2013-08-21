@@ -31,8 +31,8 @@
 #include "string.h"
 #include "thread.h"
 
-static thread_t* all_threads_head;
-static thread_t* all_threads_tail;
+/* List of all threads in the system */
+static thread_queue_t all_threads;
 
 /* Queue of runnable threads */
 static thread_queue_t run_queue;
@@ -66,7 +66,13 @@ static tlocal_destructor_t tlocal_destructors[MAX_TLOCAL_KEYS];
  */
 static void all_threads_add(thread_t* thread)
 {
-
+    if (all_threads.head == NULL) {
+        all_threads.head = thread;
+    } else if (all_threads.tail != NULL) {
+        all_threads.tail->list_next = thread;
+    }
+    thread->list_next = NULL;
+    all_threads.tail = thread;
 }
 
 /*
@@ -74,8 +80,15 @@ static void all_threads_add(thread_t* thread)
  */
 static void all_threads_remove(thread_t* thread)
 {
-
+    thread_t** t = &all_threads.head;
+    while (*t) {
+        if (thread == *t) {
+            *t = (*t)->list_next;
+        }
+        t = &(*t)->list_next;
+    }
 }
+
 
 /*
  * 'Empty' a thread queue.
@@ -91,15 +104,29 @@ static void clear_thread_queue(thread_queue_t* queue)
  */
 static void enqueue_thread(thread_queue_t* queue, thread_t* thread)
 {
+    if (queue->head == NULL) {
+        queue->head = thread;
+    } else if (queue->tail != NULL) {
+        queue->tail->queue_next = thread;
+    }
 
+    thread->queue_next = NULL;
+    queue->tail = thread;
 }
 
 /*
  * Remove a thread from a thread queue
+ * LOL @ no temporary 'prev' pointer, thanks Linus...
  */
 static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
 {
-
+    thread_t** t = &queue->head;
+    while (*t) {
+        if (thread == *t) {
+            *t = (*t)->queue_next;
+        }
+        t = &(*t)->queue_next;
+    }
 }
 
 /*
@@ -116,7 +143,7 @@ static inline void push_dword(thread_t* thread, uint32_t value)
  * Initialize members of a kernel thread
  */
 static void init_thread(thread_t* thread, void* stack_page,
-        unsigned int priority, bool detached)
+        priority_t priority, bool detached)
 {
     static unsigned int next_free_id = 1;
 
@@ -158,7 +185,6 @@ static thread_t* create_thread(unsigned int priority, bool detached)
 
     init_thread(thread, stack_page, priority, detached);
 
-    /* TODO: append to all thread list */
     all_threads_add(thread);
 
     return thread;
@@ -281,7 +307,37 @@ static void idle(uint32_t arg)
     }
 }
 
+static void reaper(uint32_t arg)
+{
+    thread_t* thread;
 
+    kcli();
+
+    while (true) {
+        /* check if any threads need disposal */
+        if ((thread = graveyard_queue.head) == NULL) {
+            /* graveyard empty... wait for thread to die */
+            wait(&reaper_wait_queue);
+        } else {
+            /* empty the graveyard queue */
+            clear_thread_queue(&graveyard_queue);
+
+            /* re-enable interrupts. all threads needing disposal
+             * have been disposed. */
+            yield();    /* allow other threads to run? */
+
+            while (thread != 0) {
+                thread_t* next = thread->queue_next;
+
+                destroy_thread(thread);
+                thread = next;
+            }
+
+            /* disable interrupts again for another iteration of diposal */
+            kcli();
+        }
+    }
+}
 
 void yield(void)
 {
@@ -314,4 +370,76 @@ void wake_up(thread_queue_t* wait_queue)
 void wake_up_one(thread_queue_t* wait_queue)
 {
 
+}
+
+void start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
+        priority_t priority, bool detached)
+{
+    thread_t* thread = create_thread(priority, detached);
+
+    if (thread) {
+        setup_kernel_thread(thread, start_function, arg);
+
+        make_runnable_atomic(thread);
+    }
+}
+
+/*
+ * Add thread to run queue so it will be scheduled
+ */
+void make_runnable(thread_t* thread)
+{
+    KASSERT(!interrupts_enabled());
+    enqueue_thread(&run_queue, thread);
+}
+
+/*
+ * Assumes interrupts are enabled before
+ * atomically making thread runnable
+ */
+void make_runnable_atomic(thread_t* thread)
+{
+    kcli();
+    make_runnable(thread);
+    ksti();
+}
+
+thread_t* get_current_thread(void)
+{
+    return g_current_thread;
+}
+
+void scheduler_init(void)
+{
+    extern char main_thread_addr, kernel_stack_bottom;
+    thread_t* main_thread = (thread_t*)&main_thread_addr;
+
+    init_thread(main_thread, (void*)&kernel_stack_bottom, PRIORITY_NORMAL, true);
+    g_current_thread = main_thread;
+    all_threads_add(g_current_thread);
+
+    start_kernel_thread(idle, 0, PRIORITY_IDLE, true);
+
+    //start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
+}
+
+void dump_all_threads_list(void)
+{
+    thread_t* thread;
+    int count = 0;
+    bool iflag = beg_int_atomic();
+
+    thread = all_threads.head;
+
+    kprintf("[");
+    while (thread != NULL) {
+        ++count;
+        kprintf("<%x %x>", (uintptr_t)thread, (uintptr_t)thread->list_next);
+        //KASSERT(thread != thread->list_next);
+        thread = thread->list_next;
+    }
+    kprintf("]\n");
+    kprintf("%d threads are running\n", count);
+
+    end_int_atomic(iflag);
 }

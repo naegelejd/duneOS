@@ -33,18 +33,33 @@
 /* forward declaration for now */
 struct user_context;
 
+
+/* thread queues/lists */
 struct thread_queue {
     struct kthread* head;
     struct kthread* tail;
 };
 typedef struct thread_queue thread_queue_t;
 
+/* thread-local data */
 enum { MAX_TLOCAL_KEYS = 128 };
+typedef void (*tlocal_destructor_t)(void *);
+typedef unsigned int tlocal_key_t;
 
+enum priority {
+    PRIORITY_IDLE = 0,
+    PRIORITY_USER = 1,
+    PRIORITY_LOW  = 2,
+    PRIORITY_NORMAL = 5,
+    PRIORITY_HIGH = 10
+};
+typedef enum priority priority_t;
+
+/* kernel thread definition */
 struct kthread {
     uint32_t esp;
     volatile uint32_t num_ticks;
-    int priority;
+    priority_t priority;
 
     void* stack_page;
     struct user_context* ucontext;
@@ -59,13 +74,11 @@ struct kthread {
     /* kernel thread ID and process ID */
     unsigned int id;
 
-    /* link to threads in current queue */
-    struct kthread* thread_queue_prev;
-    struct kthread* thread_queue_next;
+    /* link to next thread in current queue */
+    struct kthread* queue_next;
 
     /* link to all threads in system */
-    struct kthread* all_threads_prev;
-    struct kthread* all_threads_next;
+    struct kthread* list_next;
 
     /* array of pointers to thread-local data */
     const void* tlocal_data[MAX_TLOCAL_KEYS];
@@ -75,10 +88,6 @@ typedef struct kthread thread_t;
 /* Thread start functions must match this signature. */
 typedef void (*thread_start_func_t)(uint32_t arg);
 
-/* thread-local data */
-typedef void (*tlocal_destructor_t)(void *);
-typedef unsigned int tlocal_key_t;
-
 
 void wait(thread_queue_t* wait_queue);
 void wake_up(thread_queue_t* wait_queue);
@@ -86,8 +95,15 @@ void wake_up_one(thread_queue_t* wait_queue);
 
 void yield(void);
 void exit(int exit_code) __attribute__ ((noreturn));
+
+void start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
+        priority_t priority, bool detached);
+void make_runnable(thread_t* thread);
+void make_runnable_atomic(thread_t* thread);
+
 void schedule(void);
+void scheduler_init();
 
-
+void dump_all_threads_list(void);
 
 #endif /* DUNE_THREAD_H */

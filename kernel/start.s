@@ -6,6 +6,9 @@ align 4
 KERNEL_CS equ 1 << 3
 KERNEL_DS equ 2 << 3
 
+STACK_SIZE          equ 0x1000 ; 4KB stack
+THREAD_CONTEXT_SIZE equ 0x1000 ; 4KB just for thread struct
+
 MBOOT_PAGE_ALIGN    equ 0x1
 MBOOT_MEM_INFO      equ 0x2
 MBOOT_USE_GFX       equ 0x4
@@ -37,9 +40,7 @@ multiboot:
 [extern main]
 [global g_start]
 g_start:
-    ;mov esp, stack_top  ; set up stack pointer
-    mov esp, 0x7FFFF  ; set up stack pointer
-    ;push esp   ; push stack pointer
+    mov esp, kernel_stack_top ; set up stack pointer
     push eax    ; push header magic
     push ebx    ; push header pointer
     cli
@@ -218,5 +219,13 @@ get_eflags:
     pop eax     ; pop contents into eax
     ret
 
+
 section .bss
-    resb 8192   ; reserve 8K
+[global kernel_stack_bottom]
+[global kernel_stack_top]
+[global main_thread_addr]
+main_thread_addr:
+    resb THREAD_CONTEXT_SIZE    ; reserve 4K for main kernel thread struct
+kernel_stack_bottom:
+    resb STACK_SIZE     ; reserve 4KB for kernel stack
+kernel_stack_top:
