@@ -43,7 +43,7 @@ g_start:
     mov esp, kernel_stack_top ; set up stack pointer
     push eax    ; push header magic
     push ebx    ; push header pointer
-    cli
+    cli         ; disable interrupts
     call main
 
     cli

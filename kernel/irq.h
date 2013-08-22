@@ -14,6 +14,8 @@ enum {
 };
 
 void irq_install();
-void irq_install_handler(int irq, int_handler_t handler);
+void irq_install_handler(unsigned int irq, int_handler_t handler);
+void enable_irq(unsigned int irq);
+void disable_irq(unsigned int irq);
 
 #endif /* DUNE_IRQ_H */

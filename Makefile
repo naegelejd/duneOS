@@ -3,7 +3,9 @@ CCHOME = $(HOME)/opt/cross
 CC = $(CCHOME)/bin/i386-elf-gcc
 NASM = nasm
 
-CFLAGS = -DDUNE -std=gnu99 -Wall -Wextra -pedantic -nostdlib -nostdinc -ffreestanding -finline-functions
+DEFINES = -DDUNE -DQEMU_DEBUG -g
+CFLAGS = $(DEFINES) --std=gnu99 -Wall -Wextra -pedantic -nostdlib -nostdinc \
+	-ffreestanding -finline-functions
 NFLAGS = -felf
 LFLAGS = #-lgcc
 
@@ -24,7 +26,7 @@ ISO = Dune32.iso
 GRUB_CFG = grub.cfg
 
 QEMU = qemu-system-i386
-QARGS = -m 32
+QARGS = -m 32 -debugcon stdio
 
 .PHONY: all
 all: $(KERNEL)

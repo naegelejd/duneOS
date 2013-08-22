@@ -68,8 +68,8 @@ struct kthread {
 
     /* join()-related members */
     bool alive;
-    thread_queue_t* joinq;
-    int exitcode;
+    thread_queue_t join_queue;
+    int exit_code;
 
     /* kernel thread ID and process ID */
     unsigned int id;

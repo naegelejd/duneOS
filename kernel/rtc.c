@@ -133,7 +133,6 @@ void rtc_handler(struct regs *r)
 
 void rtc_install(void)
 {
-    kcli();
     irq_install_handler(IRQ_RTC, rtc_handler);
 
     /* determine if values are packed BCD or Binary */
@@ -147,4 +146,6 @@ void rtc_install(void)
     uint8_t prev = read_cmos(CMOS_STATUS_REGB);
     /* write previous value with bit 6 turned on */
     write_cmos(CMOS_STATUS_REGB, prev | 0x40);
+
+    enable_irq(IRQ_RTC);
 }

@@ -15,13 +15,7 @@ extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
 void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
-    /* double check that interrupts are disabled */
-    /* kcli(); */
-    KASSERT(&g_code < &g_data);
-    KASSERT(&g_data < &g_bss);
-    KASSERT(&g_bss < &g_end);
-
-    bss_init();     /* zero all static data */
+    /* interrupts are disabled */
 
     kcls();
     kprintf("Welcome to DuneOS...\n\n");
@@ -32,31 +26,26 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
         return;
     }
 
+    bss_init();     /* zero all static data */
     gdt_install();
     kprintf("GDT installed\n");
     idt_install();
     kprintf("IDT and ISRs installed\n");
     irq_install();
     kprintf("IRQ handlers installed\n");
-
+    tss_init();
     mem_init(mbinfo);
     kprintf("Memory manager and Heap initialized\n");
+
+    /* re-enable interrupts */
+    sti();
 
     scheduler_init();
     kprintf("Scheduler initialized\n");
     dump_all_threads_list();
 
-    tss_init();
-    kprintf("TSS installed\n");
-
     /* paging_install(&g_end); */
     /* kprintf("Paging enabled\n"); */
-
-    timer_install();
-    keyboard_install();
-    rtc_install();
-
-    ksti();
 
     char *tmp = "Hello World!\n";
     char *new = malloc(strlen(tmp) + 1);
@@ -65,7 +54,9 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("%s\n", new);
     free(new);
 
-    print_esp();
+    timer_install();
+    keyboard_install();
+    rtc_install();
 
     /* uint32_t* page_fault = 0xFFFFF0000; */
     /* kprintf("page fault? 0x%x\n", *page_fault); */

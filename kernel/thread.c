@@ -130,6 +130,15 @@ static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
 }
 
 /*
+ * Clean up thread-local data.
+ * Assumes interrupts disabled
+ */
+static void tlocal_exit(thread_t* thread)
+{
+
+}
+
+/*
  * Push a 32-bit value onto the thread's stack.
  * Used for initializing threads.
  */
@@ -145,12 +154,13 @@ static inline void push_dword(thread_t* thread, uint32_t value)
 static void init_thread(thread_t* thread, void* stack_page,
         priority_t priority, bool detached)
 {
-    static unsigned int next_free_id = 1;
+    static unsigned int next_free_id = 0;
 
     thread_t* owner = detached ? NULL : g_current_thread;
 
     memset(thread, 0, sizeof(thread_t));
     thread->stack_page = stack_page;
+    /* TODO: don't assume thread stack is PAGE_SIZE bytes */
     thread->esp = (uintptr_t)stack_page + PAGE_SIZE;
     thread->priority = priority;
     thread->owner = owner;
@@ -158,9 +168,10 @@ static void init_thread(thread_t* thread, void* stack_page,
     thread->refcount = detached ? 1 : 2;
     thread->alive = true;
 
-    clear_thread_queue(thread->joinq);
+    clear_thread_queue(&thread->join_queue);
 
     thread->id = next_free_id++;
+    dbgprintf("New thread pid: %d\n", thread->id);
 }
 
 /*
@@ -169,16 +180,20 @@ static void init_thread(thread_t* thread, void* stack_page,
  */
 static thread_t* create_thread(unsigned int priority, bool detached)
 {
-    thread_t* thread;
+    thread_t* thread = NULL;
     void* stack_page = NULL;
 
     thread = alloc_page();
+    dbgprintf("Allocated page @ 0x%x for thread context\n", thread);
     if (!thread) {
+        kprintf("Failed to allocate page for thread\n");
         return NULL;
     }
 
     stack_page = alloc_page();
+    dbgprintf("Allocated page @ 0x%x for thread stack\n", stack_page);
     if (!stack_page) {
+        kprintf("Failed to allocate page for thread stack\n");
         free_page(thread);
         return NULL;
     }
@@ -196,13 +211,13 @@ static thread_t* create_thread(unsigned int priority, bool detached)
  */
 static void destroy_thread(thread_t* thread)
 {
-    kcli();
+    cli();
     free_page(thread->stack_page);
     free_page(thread);
 
     all_threads_remove(thread);
 
-    ksti();
+    sti();
 }
 
 /*
@@ -236,7 +251,7 @@ static void detach_thread(thread_t* thread)
  */
 static void launch_thread(void)
 {
-    ksti();
+    sti();
 }
 
 /*
@@ -311,7 +326,7 @@ static void reaper(uint32_t arg)
 {
     thread_t* thread;
 
-    kcli();
+    cli();
 
     while (true) {
         /* check if any threads need disposal */
@@ -334,22 +349,45 @@ static void reaper(uint32_t arg)
             }
 
             /* disable interrupts again for another iteration of diposal */
-            kcli();
+            cli();
         }
     }
 }
 
 void yield(void)
 {
-    kcli();
+    cli();
     //make_runnable(g_current_thread);
     //schedule();
-    ksti();
+    sti();
 }
 
+/*
+ * Exit current thread and initiate a context switch
+ */
 void exit(int exit_code)
 {
+    thread_t* current = g_current_thread;
 
+    if (interrupts_enabled()) {
+        cli();
+    }
+
+    current->exit_code = exit_code;
+    current->alive = false;
+
+    /* clean up thread-local data */
+    tlocal_exit(current);
+
+    /* notify thread's possible owner */
+    wake_up(&current->join_queue);
+
+    /* remove thread's implicit reference to itself */
+    detach_thread(current);
+
+    schedule();
+
+    KASSERT(false);
 }
 
 void schedule(void)
@@ -377,6 +415,7 @@ void start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
 {
     thread_t* thread = create_thread(priority, detached);
 
+    KASSERT(thread != NULL);    /* was thread created? */
     if (thread) {
         setup_kernel_thread(thread, start_function, arg);
 
@@ -399,9 +438,9 @@ void make_runnable(thread_t* thread)
  */
 void make_runnable_atomic(thread_t* thread)
 {
-    kcli();
+    cli();
     make_runnable(thread);
-    ksti();
+    sti();
 }
 
 thread_t* get_current_thread(void)
@@ -420,7 +459,7 @@ void scheduler_init(void)
 
     start_kernel_thread(idle, 0, PRIORITY_IDLE, true);
 
-    //start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
+    start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
 }
 
 void dump_all_threads_list(void)

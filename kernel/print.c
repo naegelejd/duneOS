@@ -1,4 +1,4 @@
-#include <stdbool.h>
+#include <stdarg.h>
 #include "print.h"
 #include "string.h"
 #include "screen.h" /* for kputc */
@@ -8,27 +8,11 @@ enum { NUM_BUF_SIZE = 12 };
 
 typedef void (*cput_t) (char **, char);
 
-static void putc_screen(char **, char);
-static void putc_string(char **, char);
 static size_t uint2str(char *, unsigned int, unsigned int, bool);
 static int a2d(char);
 static unsigned int str2uint(char **, int);
 static void put_string(char **, cput_t, char *, int, bool);
 static size_t kvasprintf(char **, cput_t, char *, va_list);
-
-
-/* calls kputc to put a char on the screen */
-static void putc_screen(char **s, char c)
-{
-    (void)s;    /* prevent 'unused parameter' warning */
-    kputc(c);
-}
-
-/* appends a char to a string */
-static void putc_string(char **s, char c)
-{
-    *(*s)++ = c;
-}
 
 static size_t uint2str(char *buf, unsigned int num, unsigned int base, bool uppercase)
 {
@@ -196,7 +180,33 @@ vkprint_end:
     return length;
 }
 
+/* appends a char to a string */
+static void putc_string(char **s, char c)
+{
+    *(*s)++ = c;
+}
 
+/* prints a formatted string to a char buffer */
+size_t ksprintf(char *s, char *fmt, ...)
+{
+    va_list arg;
+    size_t sz;
+
+    va_start(arg, fmt);
+    sz = kvasprintf(&s, putc_string, fmt, arg);
+    va_end(arg);
+
+    return sz;
+}
+
+/* calls kputc to put a char on the screen */
+static void putc_screen(char **s, char c)
+{
+    (void)s;    /* prevent 'unused parameter' warning */
+    kputc(c);
+}
+
+/* prints a formatted string to a the console */
 size_t kprintf(char *fmt, ...)
 {
     va_list arg;
@@ -209,14 +219,28 @@ size_t kprintf(char *fmt, ...)
     return sz;
 }
 
-size_t ksprintf(char *s, char *fmt, ...)
+#ifdef QEMU_DEBUG
+
+#include "io.h"
+
+enum { QEMU_DEBUG_PORT = 0xE9 };
+
+static void putc_debug(char **s, char c)
+{
+    (void)s;    /* prevent 'unused parameter' warning */
+    outportb(QEMU_DEBUG_PORT, c);
+}
+
+size_t dbgprintf(char *fmt, ...)
 {
     va_list arg;
     size_t sz;
 
     va_start(arg, fmt);
-    sz = kvasprintf(&s, putc_string, fmt, arg);
+    sz = kvasprintf(NULL, putc_debug, fmt, arg);
     va_end(arg);
 
     return sz;
 }
+
+#endif /* QEMU_DEBUG */

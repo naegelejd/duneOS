@@ -22,10 +22,56 @@
  *  14       Primary ATA Hard Disk
  *  15       Secondary ATA Hard Disk
  */
+
+enum {
+    MASTER_PIC_CMD = 0x20,
+    MASTER_PIC_DATA = 0x21,
+    SLAVE_PIC_CMD = 0xA0,
+    SLAVE_PIC_DATA = 0xA1
+};
+
 extern void irq0(), irq1(), irq2(), irq3(), irq4(), irq5(), irq6(), irq7();
 extern void irq8(), irq9(), irq10(), irq11(), irq12(), irq13(), irq14(), irq15();
 
 static int_handler_t g_isrs[NUM_IRQ_HANDLERS];
+
+/* static copy of the IRQ mask from MASTER/SLAVE PIC data ports */
+static uint16_t g_irq_mask;
+
+static void update_irq_mask(uint16_t mask) {
+    /* if the lower 8-bits don't match, update the MASTER port */
+    if ((mask & 0xFF) != (g_irq_mask & 0xFF)) {
+        outportb(MASTER_PIC_DATA, mask & 0xFF);
+    }
+
+    /* if the upper 8-bits don't match, update the SLAVE port */
+    if (((mask >> 8) & 0xFF) != ((g_irq_mask >> 8) & 0xFF)) {
+        outportb(SLAVE_PIC_DATA, (mask >> 8) & 0xFF);
+    }
+    /* update our static record of the irq mask */
+    g_irq_mask = mask;
+}
+
+void enable_irq(unsigned int irq)
+{
+    bool iflag = beg_int_atomic();
+    KASSERT(irq <= NUM_IRQ_HANDLERS);
+    uint16_t mask = g_irq_mask;
+    mask &= ~(1 << irq);
+    update_irq_mask(mask);
+    end_int_atomic(iflag);
+}
+
+void disable_irq(unsigned int irq)
+{
+    bool iflag = beg_int_atomic();
+    KASSERT(irq <= NUM_IRQ_HANDLERS);
+    uint16_t mask = g_irq_mask;
+    mask |= 1 << irq;
+    update_irq_mask(mask);
+    end_int_atomic(iflag);
+}
+
 
 /* Normally, IRQ 0-8 are mapped to IDT entries 8-15.
  * These conflict with the IDT entries already installed.
@@ -34,24 +80,30 @@ static int_handler_t g_isrs[NUM_IRQ_HANDLERS];
  */
 void irq_remap(void)
 {
-    outportb(0x20, 0x11); /* write ICW1 to PICM, we are gonna write commands to PICM */
-    outportb(0xA0, 0x11); /* write ICW1 to PICS, we are gonna write commands to PICS */
+    outportb(MASTER_PIC_CMD, 0x11); /* write ICW1 to PICM, we are gonna write commands to PICM */
+    outportb(SLAVE_PIC_CMD, 0x11); /* write ICW1 to PICS, we are gonna write commands to PICS */
 
-    outportb(0x21, IRQ_ISR_START); /* remap PICM to 0x20 (32 decimal) */
-    outportb(0xA1, IRQ_ISR_START + 8); /* remap PICS to 0x28 (40 decimal) */
+    outportb(MASTER_PIC_DATA, IRQ_ISR_START); /* remap PICM to MASTER_PIC_CMD (32 decimal) */
+    outportb(SLAVE_PIC_DATA, IRQ_ISR_START + 8); /* remap PICS to 0x28 (40 decimal) */
 
-    outportb(0x21, 0x04); /* IRQ2 -> connection to slave */
-    outportb(0xA1, 0x02);
+    outportb(MASTER_PIC_DATA, 0x04); /* IRQ2 -> connection to slave */
+    outportb(SLAVE_PIC_DATA, 0x02);
 
-    outportb(0x21, 0x01); /* write ICW4 to PICM, we are gonna write commands to PICM */
-    outportb(0xA1, 0x01); /* write ICW4 to PICS, we are gonna write commands to PICS */
+    outportb(MASTER_PIC_DATA, 0x01); /* write ICW4 to PICM, we are gonna write commands to PICM */
+    outportb(SLAVE_PIC_DATA, 0x01); /* write ICW4 to PICS, we are gonna write commands to PICS */
 
-    outportb(0x21, 0x0); /* enable all IRQs on PICM */
-    outportb(0xA1, 0x0); /* enable all IRQs on PICS */
+    /* disable (mask) all but 2 IRQs on PICM */
+    outportb(MASTER_PIC_DATA, g_irq_mask & 0xFF);
+    /* disable (mask) all IRQs on PICS */
+    outportb(SLAVE_PIC_DATA, (g_irq_mask >> 8) & 0xFF);
 }
 
 void irq_install(void)
 {
+    /* IMPORTANT: initialize IRQ mask to 0xFFFB,
+     * which disables all IRQs except the cascade (for slave PIC)
+     */
+    g_irq_mask = 0xFFFB;
     irq_remap();
 
     idt_set_int_gate(IRQ_ISR_START, (uintptr_t)irq0, 0);
@@ -72,9 +124,9 @@ void irq_install(void)
     idt_set_int_gate(IRQ_ISR_START + 15, (uintptr_t)irq15, 0);
 }
 
-void irq_install_handler(int irq, int_handler_t handler)
+void irq_install_handler(unsigned int irq, int_handler_t handler)
 {
-    KASSERT((irq < NUM_IRQ_HANDLERS) && (irq >= 0));
+    KASSERT(irq < NUM_IRQ_HANDLERS);
     g_isrs[irq] = handler;
 }
 
@@ -97,9 +149,9 @@ void default_irq_handler(struct regs *r)
      * (meaning IRQ8-15), then send 'End of Interrupt' to
      * slave interrupt controller */
     if (irq > 7) {
-        outportb(0xA0, 0x20);
+        outportb(SLAVE_PIC_CMD, MASTER_PIC_CMD);
     }
 
     /* regardless, send and EOI to master interrupt controller */
-    outportb(0x20, 0x20);
+    outportb(MASTER_PIC_CMD, MASTER_PIC_CMD);
 }

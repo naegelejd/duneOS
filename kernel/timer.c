@@ -38,6 +38,7 @@ void timer_install()
     /* set frequency to 1 KHz... 100 Hz is more accurate */
     set_timer_frequency(1000);
     irq_install_handler(IRQ_TIMER, timer_handler);
+    enable_irq(IRQ_TIMER);
 }
 
 void delay(unsigned int ticks)

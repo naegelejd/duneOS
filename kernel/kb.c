@@ -92,4 +92,5 @@ void keyboard_handler(struct regs *r)
 void keyboard_install()
 {
     irq_install_handler(IRQ_KEYBOARD, keyboard_handler);
+    enable_irq(IRQ_KEYBOARD);
 }

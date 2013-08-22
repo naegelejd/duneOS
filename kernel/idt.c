@@ -87,7 +87,7 @@ void idt_install()
     char *isr9addr = (char*)(uintptr_t)isr9;    /* pedantic */
     uintptr_t isr_no_err_size = isr8addr - isr7addr;
     uintptr_t isr_err_size = isr9addr - isr8addr;
-    kprintf("Sizeof ISR with... no error code: %u, error code: %u\n",
+    dbgprintf("Sizeof ISR with... no error code: %u, error code: %u\n",
             isr_no_err_size, isr_err_size);
 
     /* Set up the special IDT pointer */

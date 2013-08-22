@@ -12,9 +12,9 @@ void khalt()
     asm volatile ("cli\nhlt");
 }
 
-void print_esp()
+uint32_t get_esp()
 {
     uint32_t esp;
     asm volatile ("mov %%esp, %0\n" : "=o" (esp) :);
-    kprintf("esp: 0x%x\n", esp);
+    return esp;
 }

@@ -26,7 +26,7 @@ bool interrupts_enabled(void);
 bool beg_int_atomic(void);
 void end_int_atomic(bool);
 
-void kcli(void);
-void ksti(void);
+void cli(void);
+void sti(void);
 
 #endif /* DUNE_INT_H */
