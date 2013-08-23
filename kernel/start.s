@@ -57,13 +57,13 @@ g_start:
 gdt_flush:
     mov eax, [esp+4]
     lgdt [eax]      ; load our GDT pointer from 'gdt.c'
-    mov ax, 0x10    ; offset into GDT for kernel data segment
+    mov ax, KERNEL_DS    ; offset into GDT for kernel data segment
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    jmp 0x08:.flush ; offset into GDT for kernel code segment (far jump)
+    jmp KERNEL_CS:.flush ; offset into GDT for kernel code segment (far jump)
 .flush:
     ret
 
@@ -74,11 +74,41 @@ idt_flush:
     lidt [eax]
     ret
 
+%macro pushregs 0
+    ;pusha      ; Push EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI
+    push eax
+    push ecx
+    push edx
+    push ebx
+    push ebp
+    push esi
+    push edi
+
+    push ds
+    push es
+    push fs
+    push gs
+%endmacro
+
+%macro popregs 0
+    pop gs
+    pop fs
+    pop es
+    pop ds
+
+    pop edi
+    pop esi
+    pop ebp
+    pop ebx
+    pop edx
+    pop ecx
+    pop eax
+    ;popa       ; Pop EDI, ESI, EBP, ESP, EBX, EDX, ECX, EAX
+%endmacro
 
 %macro isr_no_err 1
 [global isr%1]
 isr%1:
-    cli
     push dword 0
     push dword %1
     jmp isr_common_stub
@@ -87,7 +117,6 @@ isr%1:
 %macro isr_err_code 1
 [global isr%1]
 isr%1:
-    cli
     nop
     nop
     push dword %1
@@ -129,12 +158,8 @@ isr_no_err intno
 ; Save processor state, set up for kernel mode segments,
 ; call C-level fault handler, restore processor state
 isr_common_stub:
-    pusha
-    push ds
-    push es
-    push fs
-    push gs
-    mov ax, 0x10    ; Load the Kernel Data Segment descriptor
+    pushregs
+    mov ax, KERNEL_DS   ; Load the Kernel Data Segment descriptor
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -144,13 +169,8 @@ isr_common_stub:
     mov eax, default_int_handler
     call eax        ; A special call, preserves the 'eip' register
     pop eax
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popa
+    popregs
     add esp, 8      ; Cleans up pushed error code and pushed ISR number
-    sti             ; re-enable interrupts
     iret            ; Pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
 
 
@@ -160,7 +180,6 @@ isr_common_stub:
 %macro irq_handle 1
 [global irq%1]
 irq%1:
-    cli
     push byte 0
     push byte 32+%1
     jmp irq_common_stub
@@ -187,12 +206,8 @@ irq_handle 15    ; IRQ 14 (IDT 47)
 [extern default_irq_handler]
 ; calls default_irq_handler defined in 'irq.c'
 irq_common_stub:
-    pusha           ; push EDI, ESI, EBP, ESP, EBX, EDX, ECX, EAX
-    push ds
-    push es
-    push fs
-    push gs
-    mov ax, 0x10    ; load kernel data segment descriptor
+    pushregs
+    mov ax, KERNEL_DS   ; load kernel data segment descriptor
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -202,13 +217,8 @@ irq_common_stub:
     mov eax, default_irq_handler
     call eax        ; preserves EIP ?
     pop eax
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popa
+    popregs
     add esp, 8      ; clean up pushed error code and ISR number
-    sti             ; re-enable interrupts
     iret            ; pop CS, EIP, EFLAGS, SS, and ESP
 
 
@@ -218,6 +228,49 @@ get_eflags:
     pushfd      ; push eflags
     pop eax     ; pop contents into eax
     ret
+
+; switch to a new thread
+; when switch_to_thread is called, the stack looks like:
+;       - pointer to thread
+;       - func return address
+; but we change it to look like:
+;       - pointer to thread
+;       - EFLAGS
+;       - CS
+;       - func return address
+; so it looks like an interrupt occurred
+[extern g_current_thread]
+[global switch_to_thread]
+switch_to_thread:
+    push eax            ; save eax
+    mov eax, [esp+4]    ; put return address in eax
+    mov [esp-4], eax    ; move return address down 8 bytes
+    add esp, 8
+    pushfd              ; push EFLAGS
+    mov eax, [esp-4]    ; restore saved value of eax
+    push dword KERNEL_CS
+    sub esp, 4          ; move esp back to return address
+
+    push dword 0        ; push fake interrupt error code
+    push dword 0        ; push fake interrupt number
+
+    pushregs
+
+    mov eax, [g_current_thread]
+    mov [eax+0], esp            ; set thread's stack pointer
+
+    mov [eax+4], dword 0        ; clear num_ticks field
+
+    mov eax, [esp + 64]         ; load pointer to new thread
+                                ; skipping sizeof(struct regs)
+
+    mov [g_current_thread], eax ; update new current thread
+    mov esp, [eax+0]            ; update ESP
+
+    popregs
+    add esp, 8      ; skip over fake error code, fake INT number
+
+    iret
 
 
 section .bss

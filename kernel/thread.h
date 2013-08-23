@@ -46,6 +46,9 @@ enum { MAX_TLOCAL_KEYS = 128 };
 typedef void (*tlocal_destructor_t)(void *);
 typedef unsigned int tlocal_key_t;
 
+/* global quantum (number of ticks before current thread yields) */
+enum { THREAD_QUANTUM = 50 };
+
 enum priority {
     PRIORITY_IDLE = 0,
     PRIORITY_USER = 1,
@@ -88,7 +91,9 @@ typedef struct kthread thread_t;
 /* Thread start functions must match this signature. */
 typedef void (*thread_start_func_t)(uint32_t arg);
 
+thread_t* get_current_thread(void);
 
+int join(thread_t* thread);
 void wait(thread_queue_t* wait_queue);
 void wake_up(thread_queue_t* wait_queue);
 void wake_up_one(thread_queue_t* wait_queue);
@@ -96,8 +101,8 @@ void wake_up_one(thread_queue_t* wait_queue);
 void yield(void);
 void exit(int exit_code) __attribute__ ((noreturn));
 
-void start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
-        priority_t priority, bool detached);
+thread_t* start_kernel_thread(thread_start_func_t start_function,
+        uint32_t arg, priority_t priority, bool detached);
 void make_runnable(thread_t* thread);
 void make_runnable_atomic(thread_t* thread);
 

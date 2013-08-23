@@ -10,13 +10,17 @@ struct regs {
     uint32_t gs, fs, es, ds;
 
     /* pushed by 'pusha' */
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    /* uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; */
+    uint32_t edi, esi, ebp, ebx, edx, ecx, eax;
 
     /* pushed in ISR */
     uint32_t int_no, err_code;
 
     /* pushed by proc automatically */
-    uint32_t epi, cs, eflags, useresp, ss;
+    uint32_t eip, cs, eflags;
+
+    /* pushed in user mode? */
+    /* uint32_t useresp, ss; */
 };
 
 typedef void (*int_handler_t)(struct regs *r);

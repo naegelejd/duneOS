@@ -139,11 +139,14 @@ void default_irq_handler(struct regs *r)
     /* empty handler pointer */
     int_handler_t handler = NULL;
 
-    /* run IRQ-specific handler if installed */
     int irq = r->int_no - IRQ_ISR_START;
     KASSERT((irq < NUM_IRQ_HANDLERS) && (irq >= 0));
+
+    /* run IRQ-specific handler if installed */
     handler = g_isrs[irq];
-    handler(r);
+    if (handler != NULL) {
+        handler(r);
+    }
 
     /* if the IDT entry invoked is greater than 40
      * (meaning IRQ8-15), then send 'End of Interrupt' to

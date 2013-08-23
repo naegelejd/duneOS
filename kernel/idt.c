@@ -142,6 +142,7 @@ void int_install_handler(int interrupt, int_handler_t handler)
     KASSERT((interrupt < NUM_IDT_ENTRIES) && (interrupt >= 0));
     g_handlers[interrupt] = handler;
 }
+
 /* Each interrupt handler calls this function (assembly),
  * which, in turn, either calls a specific handler, or
  * just prints an exception message and halts the CPU

@@ -43,8 +43,8 @@ static thread_queue_t graveyard_queue;
 /* Queue for reaper thread to communicate with dead threads */
 static thread_queue_t reaper_wait_queue;
 
-/* the global, currently-running thread */
-static thread_t *g_current_thread;
+/* global, currently-running thread */
+thread_t *g_current_thread;
 
 /* When set, the scheduler needs to choose a new runnable thread */
 bool g_need_reschedule;
@@ -290,6 +290,9 @@ static void setup_kernel_thread(thread_t* thread,
      * return address. this forces the thread to exit */
     push_dword(thread, (uintptr_t)&shutdown_thread);
 
+    /* push the address of the start function */
+    push_dword(thread, (uintptr_t)start_func);
+
     /* to make the thread schedulable, we need to make it look like
      * it was suspended by an interrupt in user mode.
      * so push all the interrupt stack values onto the stack */
@@ -317,6 +320,8 @@ static void setup_kernel_thread(thread_t* thread,
 
 static void idle(uint32_t arg)
 {
+    (void)arg; /* prevent compiler warnings */
+    dbgprintf("Idle thread idling\n");
     while (true) {
         yield();
     }
@@ -325,7 +330,7 @@ static void idle(uint32_t arg)
 static void reaper(uint32_t arg)
 {
     thread_t* thread;
-
+    (void)arg; /* prevent compiler warnings */
     cli();
 
     while (true) {
@@ -339,11 +344,12 @@ static void reaper(uint32_t arg)
 
             /* re-enable interrupts. all threads needing disposal
              * have been disposed. */
+            sti();
             yield();    /* allow other threads to run? */
 
             while (thread != 0) {
                 thread_t* next = thread->queue_next;
-
+                dbgprintf("Reaper destroying thread: 0x%x\n", thread);
                 destroy_thread(thread);
                 thread = next;
             }
@@ -357,8 +363,8 @@ static void reaper(uint32_t arg)
 void yield(void)
 {
     cli();
-    //make_runnable(g_current_thread);
-    //schedule();
+    make_runnable(g_current_thread);
+    schedule();
     sti();
 }
 
@@ -390,27 +396,111 @@ void exit(int exit_code)
     KASSERT(false);
 }
 
+thread_t* find_best(thread_queue_t* queue)
+{
+    return queue->head;
+}
+
+thread_t* get_next_runnable(void)
+{
+    thread_t* best = find_best(&run_queue);
+    KASSERT(best != NULL);
+    dequeue_thread(&run_queue, best);
+
+    return best;
+}
+
+/*
+ * Schedule a runnable thread.
+ * Called with interrupts disabled.
+ * g_current_thread should already be place on another
+ * queue (or left on run queue)
+ */
+extern void switch_to_thread(thread_t*);
 void schedule(void)
 {
+    KASSERT(!interrupts_enabled());
+    KASSERT(!g_preemption_disabled);
 
+    thread_t* runnable = get_next_runnable();
+
+    dbgprintf("Switching to thread 0x%x\n", runnable);
+    switch_to_thread(runnable);
 }
 
+/*
+ * Wait for a thread to die.
+ * Interrupts must be enabled.
+ *
+ * @returns thread exit code
+ */
+int join(thread_t* thread)
+{
+    KASSERT(interrupts_enabled());
+
+    /* only the owner can join on a thread */
+    KASSERT(thread->owner = g_current_thread);
+
+    cli();
+
+    while (thread->alive) {
+        wait(&thread->join_queue);
+    }
+
+    int exitcode = thread->exit_code;
+
+    /* release reference to thread */
+    detach_thread(thread);
+
+    sti();
+
+    return exitcode;
+}
+
+/*
+ * Place current thread on a wait queue
+ * Called with interrupts disabled.
+ */
 void wait(thread_queue_t* wait_queue)
 {
+    KASSERT(!interrupts_enabled());
 
+    thread_t* current = g_current_thread;
+
+    enqueue_thread(wait_queue, current);
+
+    schedule();
 }
 
+/*
+ * Wake up all threads waiting on a wait queue.
+ * Called with interrupts disabled.
+ */
 void wake_up(thread_queue_t* wait_queue)
 {
+    thread_t* thread = wait_queue->head;
+    thread_t* next = NULL;
 
+    while (thread) {
+        next = thread->queue_next;
+        make_runnable(thread);
+        thread = next;
+    }
+
+    clear_thread_queue(wait_queue);
 }
 
 void wake_up_one(thread_queue_t* wait_queue)
 {
-
+    KASSERT(!interrupts_enabled());
+    thread_t* best = find_best(wait_queue);
+    if (best != NULL) {
+        dequeue_thread(wait_queue, best);
+        make_runnable(best);
+    }
 }
 
-void start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
+thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
         priority_t priority, bool detached)
 {
     thread_t* thread = create_thread(priority, detached);
@@ -421,6 +511,7 @@ void start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
 
         make_runnable_atomic(thread);
     }
+    return thread;
 }
 
 /*

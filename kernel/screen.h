@@ -23,6 +23,7 @@ typedef enum {
     WHITE
 } dune_color_t;
 
+void kget_cursor(unsigned int *row, unsigned int *col);
 void kset_cursor(unsigned int row, unsigned int col);
 char kputc(char ch);
 void kcls();

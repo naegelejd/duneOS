@@ -13,6 +13,25 @@
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
+void print_date(uint32_t arg)
+{
+    unsigned int row, col;
+    struct tm dt;
+    while (arg > 0) {
+        delay(50);
+        datetime(&dt);
+        kget_cursor(&row, &col);
+        kset_cursor(0, 58);
+        kprintf("%02u:%02u:%02u %s %02u, %04u\n", dt.hour, dt.min, dt.sec,
+                month_name(dt.month), dt.mday, dt.year);
+        kset_cursor(row, col);
+
+        arg--;
+        /* yield();    /1* not necessary *1/ */
+    }
+    exit(0);
+}
+
 void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* interrupts are disabled */
@@ -58,6 +77,15 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     keyboard_install();
     rtc_install();
 
+    thread_t* date_printer = start_kernel_thread(
+            print_date, 20, PRIORITY_NORMAL, false);
+    join(date_printer);
+
+    /* yield forever, allowing other threads to run */
+    while (1) {
+        yield();
+    }
+
     /* uint32_t* page_fault = 0xFFFFF0000; */
     /* kprintf("page fault? 0x%x\n", *page_fault); */
     /* kprintf("page fault? %u\n", *page_fault); */
@@ -70,15 +98,6 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("BSS: 0x%x\n", &g_bss);
     kprintf("End: 0x%x\n", &g_end);
     */
-
-    struct tm dt;
-    while (1) {
-        delay(500);
-        datetime(&dt);
-        kset_cursor(0, 58);
-        kprintf("%02u:%02u:%02u %s %02u, %04u\n", dt.hour, dt.min, dt.sec,
-                month_name(dt.month), dt.mday, dt.year);
-    }
 
     /* playing around */
     /*

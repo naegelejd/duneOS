@@ -47,6 +47,13 @@ char kputc(char ch)
     return ch;
 }
 
+void kget_cursor(unsigned int *row, unsigned int *col)
+{
+    unsigned int offset = get_cursor_offset() / 2;
+    *row = offset / VIDEO_COLS;
+    *col = offset % VIDEO_COLS;
+}
+
 void kset_cursor(unsigned int row, unsigned int col)
 {
     unsigned int offset = screen_offset(row, col);

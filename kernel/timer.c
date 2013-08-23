@@ -1,6 +1,7 @@
 #include "irq.h"
 #include "io.h"
 #include "PIT.h"
+#include "thread.h"
 #include "timer.h"
 
 /* See PIT.h for comments on the Programmable Interval Timer */
@@ -25,18 +26,21 @@ void timer_handler(struct regs *r)
 {
     (void)r;    /* prevent 'unused' parameter warning */
     timer_ticks++;
-    /*
-    if (timer_ticks % 1000 == 0) {
-        k_puts("One second has passed\n");
+
+    /* if the current thread has outlived the quantum, add it to the
+     * run queue and schedule a new thread */
+    thread_t* current = get_current_thread();
+    if (++current->num_ticks > THREAD_QUANTUM) {
+        make_runnable(current);
+        schedule();
     }
-    */
 }
 
 /* installs timer_handler into IRQ0 */
 void timer_install()
 {
-    /* set frequency to 1 KHz... 100 Hz is more accurate */
-    set_timer_frequency(1000);
+    /* set frequence to 100 Hz */
+    set_timer_frequency(100);
     irq_install_handler(IRQ_TIMER, timer_handler);
     enable_irq(IRQ_TIMER);
 }
