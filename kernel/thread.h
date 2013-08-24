@@ -94,26 +94,30 @@ typedef struct kthread thread_t;
 /* Thread start functions must match this signature. */
 typedef void (*thread_start_func_t)(uint32_t arg);
 
-thread_t* get_current_thread(void);
+
+/* Thread-local data functions */
+bool tlocal_create(tlocal_key_t* key, tlocal_destructor_t destructor);
+void tlocal_set(tlocal_key_t key, const void* data);
+void* tlocal_get(tlocal_key_t key);
+
 
 void sleep(unsigned int ticks);
 int join(thread_t* thread);
 void wait(thread_queue_t* wait_queue);
 void wake_all(thread_queue_t* wait_queue);
 void wake_one(thread_queue_t* wait_queue);
-
 void yield(void);
 //void exit(int exit_code) __attribute__ ((noreturn));
 void exit(int exit_code);
-
-thread_t* start_kernel_thread(thread_start_func_t start_function,
-        uint32_t arg, priority_t priority, bool detached);
 void make_runnable(thread_t* thread);
 void make_runnable_atomic(thread_t* thread);
 
+thread_t* get_current_thread(void);
+thread_t* start_kernel_thread(thread_start_func_t start_function,
+        uint32_t arg, priority_t priority, bool detached);
+
 void schedule(void);
 void scheduler_init();
-
 void dump_all_threads_list(void);
 
 #endif /* DUNE_THREAD_H */

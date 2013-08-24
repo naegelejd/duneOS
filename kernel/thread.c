@@ -54,11 +54,10 @@ thread_t *g_current_thread;
 volatile bool g_preemption_disabled;
 
 
-/*
- * Counter and array of destructors for keys that access
- * thread-local data (Based on POSIX threads' thread-specific data)
- */
+/* Counter for keys that access thread-local data
+ * (Based on POSIX threads' thread-specific data) */
 static unsigned int tlocal_key_counter;
+/* Array of destructors for correspondingly keyed thread-local data */
 static tlocal_destructor_t tlocal_destructors[MAX_TLOCAL_KEYS];
 
 
@@ -130,14 +129,32 @@ static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
     }
 }
 
-
 /*
  * Clean up thread-local data.
- * Assumes interrupts disabled
+ * Calls destructors *repeatedly* until all thread-local data is NULL.
+ * Assumes interrupts disabled.
  */
 static void tlocal_exit(thread_t* thread)
 {
+    KASSERT(!interrupts_enabled());
 
+    bool repeat = false;
+    do {
+        repeat = false;     /* assume we don't need to repeat */
+        int idx;
+        for (idx = 0; idx < MAX_TLOCAL_KEYS; idx++) {
+            void* data = (void*)thread->tlocal_data[idx];
+            tlocal_destructor_t destructor = tlocal_destructors[idx];
+
+            if (data != NULL && destructor != NULL) {
+                thread->tlocal_data[idx] = NULL;
+                repeat = true;  /* need to call all destructors again */
+                sti();
+                tlocal_destructors[idx](data);
+                cli();
+            }
+        }
+    } while (repeat);
 }
 
 
@@ -396,6 +413,43 @@ static thread_t* get_next_runnable(void)
 
     return best;
 }
+
+
+/*
+ * Determine a new key and set the destructor for thread-local data.
+ *
+ * @returns true on success, false on failure (no more keys)
+ */
+bool tlocal_create(tlocal_key_t* key, tlocal_destructor_t destructor)
+{
+    KASSERT(key);
+
+    bool iflag = beg_int_atomic();
+
+    if (tlocal_key_counter >= MAX_TLOCAL_KEYS) {
+        return false;
+    }
+
+    tlocal_destructors[tlocal_key_counter] = destructor;
+    *key = tlocal_key_counter++;
+
+    end_int_atomic(iflag);
+
+    return true;
+}
+
+void tlocal_set(tlocal_key_t key, const void* data)
+{
+    KASSERT(key < tlocal_key_counter);
+    g_current_thread->tlocal_data[key] = data;
+}
+
+void* tlocal_get(tlocal_key_t key)
+{
+    KASSERT(key < tlocal_key_counter);
+    return (void*)g_current_thread->tlocal_data[key];
+}
+
 
 void yield(void)
 {
