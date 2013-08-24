@@ -19,7 +19,7 @@ void print_date(uint32_t arg)
     unsigned int row, col;
     struct tm dt;
     while (true) {
-        delay(50);
+        sleep(50);
         datetime(&dt);
         kget_cursor(&row, &col);
         kset_cursor(0, 58);
@@ -102,15 +102,6 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* kprintf("page fault? 0x%x\n", *page_fault); */
     /* kprintf("page fault? %u\n", *page_fault); */
 
-    /*
-    kprintf("Kernel size in bytes: %u\n", &g_end - &g_start);
-    kprintf("Start: 0x%x\n", &g_start);
-    kprintf("Code: 0x%x\n", &g_code);
-    kprintf("Data: 0x%x\n", &g_data);
-    kprintf("BSS: 0x%x\n", &g_bss);
-    kprintf("End: 0x%x\n", &g_end);
-    */
-
     /* playing around */
     /*
     kprintf("%u\n", 1 / 0);
@@ -119,6 +110,7 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     delay(5000);
     kreboot();
     */
+
     kcls();
     kprintf("Goodbye!");
 }

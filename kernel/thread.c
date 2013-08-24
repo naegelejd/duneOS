@@ -28,6 +28,7 @@
 #include "seg.h"
 #include "mem.h"
 #include "int.h"
+#include "timer.h"
 #include "string.h"
 #include "thread.h"
 
@@ -37,6 +38,9 @@ static thread_queue_t all_threads;
 /* Queue of runnable threads */
 static thread_queue_t run_queue;
 
+/* Queue of sleeping threads */
+static thread_queue_t sleep_queue;
+
 /* Queue of finished threads needing disposal */
 static thread_queue_t graveyard_queue;
 
@@ -45,9 +49,6 @@ static thread_queue_t reaper_wait_queue;
 
 /* global, currently-running thread */
 thread_t *g_current_thread;
-
-/* When set, the scheduler needs to choose a new runnable thread */
-bool g_need_reschedule;
 
 /* When set, interrupts will not cause a new thread to be scheduled */
 volatile bool g_preemption_disabled;
@@ -129,6 +130,7 @@ static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
     }
 }
 
+
 /*
  * Clean up thread-local data.
  * Assumes interrupts disabled
@@ -137,6 +139,7 @@ static void tlocal_exit(thread_t* thread)
 {
 
 }
+
 
 /*
  * Push a 32-bit value onto the thread's stack.
@@ -228,7 +231,7 @@ static void reap_thread(thread_t* thread)
 {
     KASSERT(!interrupts_enabled());
     enqueue_thread(&graveyard_queue, thread);
-    wake_up(&reaper_wait_queue);
+    wake_all(&reaper_wait_queue);
 }
 
 /*
@@ -252,20 +255,6 @@ static void detach_thread(thread_t* thread)
 static void launch_thread(void)
 {
     sti();
-}
-
-/*
- * Push initial values for saved general-purpose registers
- */
-static void push_general_registers(thread_t* thread)
-{
-    push_dword(thread, 0);    /* eax */
-    push_dword(thread, 0);    /* ebx */
-    push_dword(thread, 0);    /* ecx */
-    push_dword(thread, 0);    /* edx */
-    push_dword(thread, 0);    /* esi */
-    push_dword(thread, 0);    /* edi */
-    push_dword(thread, 0);    /* ebp */
 }
 
 /*
@@ -307,7 +296,14 @@ static void setup_kernel_thread(thread_t* thread,
     push_dword(thread, 0);
     push_dword(thread, 0);
 
-    push_general_registers(thread);
+    /* push general registers */
+    push_dword(thread, 0);    /* eax */
+    push_dword(thread, 0);    /* ebx */
+    push_dword(thread, 0);    /* ecx */
+    push_dword(thread, 0);    /* edx */
+    push_dword(thread, 0);    /* esi */
+    push_dword(thread, 0);    /* edi */
+    push_dword(thread, 0);    /* ebp */
 
     /* push values for saved segment registers.
      * only the DS and ES registers contain valid selectors
@@ -360,6 +356,47 @@ static void reaper(uint32_t arg)
     }
 }
 
+/*
+ * Wake up any threads that are finished sleeping
+ */
+static void wake_sleepers(void)
+{
+    thread_t* thread = sleep_queue.head;
+    thread_t* next = NULL;
+
+    while (thread) {
+        next = thread->queue_next;
+        if (get_ticks() >= thread->sleep_until) {
+            thread->sleep_until = 0;
+            /* time to wake up this sleeping thread...
+             * so remove it from sleep queue and make it runnable */
+            dequeue_thread(&sleep_queue, thread); /* FIXME - dumb inefficient */
+            make_runnable(thread);
+        }
+        thread = next;
+    }
+}
+
+/*
+ * Find best candidate thread in a thread queue.
+ *
+ * This currently returns the head of the thread queue,
+ * so the scheduling algorithm is essentially FIFO
+ */
+static thread_t* find_best(thread_queue_t* queue)
+{
+    return queue->head;
+}
+
+static thread_t* get_next_runnable(void)
+{
+    thread_t* best = find_best(&run_queue);
+    KASSERT(best != NULL);
+    dequeue_thread(&run_queue, best);
+
+    return best;
+}
+
 void yield(void)
 {
     cli();
@@ -386,52 +423,16 @@ void exit(int exit_code)
     tlocal_exit(current);
 
     /* notify thread's possible owner */
-    wake_up(&current->join_queue);
+    wake_all(&current->join_queue);
 
     /* remove thread's implicit reference to itself */
     detach_thread(current);
 
     schedule();
 
+    /* This thread will never be scheduled again, so it should
+     * never get to this point */
     KASSERT(false);
-}
-
-/*
- * Find best candidate thread in a thread queue.
- *
- * This currently returns the head of the thread queue,
- * so the scheduling algorithm is essentially FIFO
- */
-thread_t* find_best(thread_queue_t* queue)
-{
-    return queue->head;
-}
-
-thread_t* get_next_runnable(void)
-{
-    thread_t* best = find_best(&run_queue);
-    KASSERT(best != NULL);
-    dequeue_thread(&run_queue, best);
-
-    return best;
-}
-
-/*
- * Schedule a runnable thread.
- * Called with interrupts disabled.
- * g_current_thread should already be place on another
- * queue (or left on run queue)
- */
-extern void switch_to_thread(thread_t*);
-void schedule(void)
-{
-    KASSERT(!interrupts_enabled());
-    KASSERT(!g_preemption_disabled);
-
-    thread_t* runnable = get_next_runnable();
-
-    //dbgprintf("Switching to thread 0x%x\n", runnable);
-    switch_to_thread(runnable);
 }
 
 /*
@@ -464,6 +465,21 @@ int join(thread_t* thread)
 }
 
 /*
+ * Places a thread on the sleep queue.
+ * The thread will not become runnable until `ticks`
+ * number of timer ticks have passed from the time
+ * `sleep` is called.
+ */
+void sleep(unsigned int ticks)
+{
+    cli();
+    g_current_thread->sleep_until = get_ticks() + ticks;
+    enqueue_thread(&sleep_queue, g_current_thread);
+    schedule();
+    sti();
+}
+
+/*
  * Place current thread on a wait queue
  * Called with interrupts disabled.
  */
@@ -471,9 +487,7 @@ void wait(thread_queue_t* wait_queue)
 {
     KASSERT(!interrupts_enabled());
 
-    thread_t* current = g_current_thread;
-
-    enqueue_thread(wait_queue, current);
+    enqueue_thread(wait_queue, g_current_thread);
 
     schedule();
 }
@@ -482,7 +496,7 @@ void wait(thread_queue_t* wait_queue)
  * Wake up all threads waiting on a wait queue.
  * Called with interrupts disabled.
  */
-void wake_up(thread_queue_t* wait_queue)
+void wake_all(thread_queue_t* wait_queue)
 {
     thread_t* thread = wait_queue->head;
     thread_t* next = NULL;
@@ -496,7 +510,10 @@ void wake_up(thread_queue_t* wait_queue)
     clear_thread_queue(wait_queue);
 }
 
-void wake_up_one(thread_queue_t* wait_queue)
+/*
+ * Wake up (one) thread that is the best candidate for running
+ */
+void wake_one(thread_queue_t* wait_queue)
 {
     KASSERT(!interrupts_enabled());
     thread_t* best = find_best(wait_queue);
@@ -504,20 +521,6 @@ void wake_up_one(thread_queue_t* wait_queue)
         dequeue_thread(wait_queue, best);
         make_runnable(best);
     }
-}
-
-thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
-        priority_t priority, bool detached)
-{
-    thread_t* thread = create_thread(priority, detached);
-
-    KASSERT(thread != NULL);    /* was thread created? */
-    if (thread) {
-        setup_kernel_thread(thread, start_function, arg);
-
-        make_runnable_atomic(thread);
-    }
-    return thread;
 }
 
 /*
@@ -540,11 +543,59 @@ void make_runnable_atomic(thread_t* thread)
     sti();
 }
 
+/*
+ * Returns pointer to currently running thread
+ */
 thread_t* get_current_thread(void)
 {
     return g_current_thread;
 }
 
+/*
+ * Schedule a runnable thread.
+ * Called with interrupts disabled.
+ * g_current_thread should already be place on another
+ * queue (or left on run queue)
+ */
+extern void switch_to_thread(thread_t*);
+void schedule(void)
+{
+    KASSERT(!interrupts_enabled());
+    KASSERT(!g_preemption_disabled);
+
+    wake_sleepers();
+
+    thread_t* runnable = get_next_runnable();
+
+    //dbgprintf("Switching to thread 0x%x\n", runnable);
+    switch_to_thread(runnable);
+}
+
+/*
+ * Start a kernel thread with a function to execute, an unsigned
+ * integer argument to that function, its priority, and whether
+ * it should be detached from the current running thread.
+ */
+thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
+        priority_t priority, bool detached)
+{
+    thread_t* thread = create_thread(priority, detached);
+
+    KASSERT(thread != NULL);    /* was thread created? */
+    if (thread) {
+        setup_kernel_thread(thread, start_function, arg);
+
+        make_runnable_atomic(thread);
+    }
+    return thread;
+}
+
+/*
+ * Initialize the scheduler.
+ *
+ * Initializes the main kernel thread, the Idle thread,
+ * and a Reaper thread for cleaning up dead threads.
+ */
 void scheduler_init(void)
 {
     extern char main_thread_addr, kernel_stack_bottom;
@@ -559,6 +610,9 @@ void scheduler_init(void)
     start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
 }
 
+/*
+ * Dumps debugging data for each thread in the list of all threads
+ */
 void dump_all_threads_list(void)
 {
     thread_t* thread;

@@ -69,6 +69,9 @@ struct kthread {
     struct kthread* owner;
     int refcount;
 
+    /* sleep */
+    uint32_t sleep_until;
+
     /* join()-related members */
     bool alive;
     thread_queue_t join_queue;
@@ -93,13 +96,15 @@ typedef void (*thread_start_func_t)(uint32_t arg);
 
 thread_t* get_current_thread(void);
 
+void sleep(unsigned int ticks);
 int join(thread_t* thread);
 void wait(thread_queue_t* wait_queue);
-void wake_up(thread_queue_t* wait_queue);
-void wake_up_one(thread_queue_t* wait_queue);
+void wake_all(thread_queue_t* wait_queue);
+void wake_one(thread_queue_t* wait_queue);
 
 void yield(void);
-void exit(int exit_code) __attribute__ ((noreturn));
+//void exit(int exit_code) __attribute__ ((noreturn));
+void exit(int exit_code);
 
 thread_t* start_kernel_thread(thread_start_func_t start_function,
         uint32_t arg, priority_t priority, bool detached);

@@ -107,7 +107,8 @@ void keyboard_handler(struct regs *r)
          * all threads waiting on the keycode thread queue */
         uint16_t keycode = kdbus[scancode];
         enqueue_keycode(keycode);
-        wake_up(&keycode_wait_queue);
+        /* wake all threads waiting for keyboard presses */
+        wake_all(&keycode_wait_queue);
     }
 }
 

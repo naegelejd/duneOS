@@ -17,7 +17,14 @@ void set_timer_frequency(unsigned int hz)
 }
 
 /* global count of system ticks (uptime) */
-uint32_t timer_ticks = 0;
+static uint32_t g_num_ticks = 0;
+
+
+/* getter for global system tick count */
+uint32_t get_ticks(void)
+{
+    return g_num_ticks;
+}
 
 /* Handles timer interrupt.
  * By default, the timer fires at 18.222hz
@@ -25,7 +32,7 @@ uint32_t timer_ticks = 0;
 void timer_handler(struct regs *r)
 {
     (void)r;    /* prevent 'unused' parameter warning */
-    timer_ticks++;
+    g_num_ticks++;
 
     /* if the current thread has outlived the quantum, add it to the
      * run queue and schedule a new thread */
@@ -47,7 +54,7 @@ void timer_install()
 
 void delay(unsigned int ticks)
 {
-    unsigned int eticks = timer_ticks + ticks;
-    while (timer_ticks < eticks)
+    unsigned int eticks = g_num_ticks + ticks;
+    while (g_num_ticks < eticks)
         ;
 }
