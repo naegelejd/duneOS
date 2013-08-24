@@ -9,7 +9,9 @@ enum {
     KBD_CPU_RESET_PIN = 0xFE
 };
 
-
 void keyboard_install();
+
+typedef uint16_t keycode_t;
+keycode_t wait_for_key(void);
 
 #endif /* DUNE_KB_H */

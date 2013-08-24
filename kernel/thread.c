@@ -396,6 +396,12 @@ void exit(int exit_code)
     KASSERT(false);
 }
 
+/*
+ * Find best candidate thread in a thread queue.
+ *
+ * This currently returns the head of the thread queue,
+ * so the scheduling algorithm is essentially FIFO
+ */
 thread_t* find_best(thread_queue_t* queue)
 {
     return queue->head;
@@ -424,7 +430,7 @@ void schedule(void)
 
     thread_t* runnable = get_next_runnable();
 
-    dbgprintf("Switching to thread 0x%x\n", runnable);
+    //dbgprintf("Switching to thread 0x%x\n", runnable);
     switch_to_thread(runnable);
 }
 

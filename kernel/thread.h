@@ -47,7 +47,7 @@ typedef void (*tlocal_destructor_t)(void *);
 typedef unsigned int tlocal_key_t;
 
 /* global quantum (number of ticks before current thread yields) */
-enum { THREAD_QUANTUM = 50 };
+enum { THREAD_QUANTUM = 4 };
 
 enum priority {
     PRIORITY_IDLE = 0,
