@@ -51,7 +51,7 @@ static thread_queue_t reaper_wait_queue;
 thread_t *g_current_thread;
 
 /* When set, interrupts will not cause a new thread to be scheduled */
-volatile bool g_preemption_disabled;
+static volatile bool g_preemption_disabled;
 
 
 /* Counter for keys that access thread-local data
@@ -93,10 +93,18 @@ static void all_threads_remove(thread_t* thread)
 /*
  * 'Empty' a thread queue.
  */
-static void clear_thread_queue(thread_queue_t* queue)
+void thread_queue_clear(thread_queue_t* queue)
 {
     queue->head = NULL;
     queue->tail = NULL;
+}
+
+bool thread_queue_empty(thread_queue_t* queue)
+{
+    if (queue->head == NULL && queue->tail == NULL) {
+        return true;
+    }
+    return false;
 }
 
 /*
@@ -188,7 +196,7 @@ static void init_thread(thread_t* thread, void* stack_page,
     thread->refcount = detached ? 1 : 2;
     thread->alive = true;
 
-    clear_thread_queue(&thread->join_queue);
+    thread_queue_clear(&thread->join_queue);
 
     thread->id = next_free_id++;
     dbgprintf("New thread pid: %d\n", thread->id);
@@ -353,7 +361,7 @@ static void reaper(uint32_t arg)
             wait(&reaper_wait_queue);
         } else {
             /* empty the graveyard queue */
-            clear_thread_queue(&graveyard_queue);
+            thread_queue_clear(&graveyard_queue);
 
             /* re-enable interrupts. all threads needing disposal
              * have been disposed. */
@@ -561,7 +569,7 @@ void wake_all(thread_queue_t* wait_queue)
         thread = next;
     }
 
-    clear_thread_queue(wait_queue);
+    thread_queue_clear(wait_queue);
 }
 
 /*
@@ -595,14 +603,6 @@ void make_runnable_atomic(thread_t* thread)
     cli();
     make_runnable(thread);
     sti();
-}
-
-/*
- * Returns pointer to currently running thread
- */
-thread_t* get_current_thread(void)
-{
-    return g_current_thread;
 }
 
 /*
@@ -663,7 +663,6 @@ void scheduler_init(void)
 
     start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
 }
-
 /*
  * Dumps debugging data for each thread in the list of all threads
  */
@@ -686,4 +685,95 @@ void dump_all_threads_list(void)
     kprintf("%d threads are running\n", count);
 
     end_int_atomic(iflag);
+}
+
+/*
+ * Returns pointer to currently running thread
+ */
+thread_t* get_current_thread(void)
+{
+    return g_current_thread;
+}
+
+static void mutex_wait(mutex_t *mutex)
+{
+    KASSERT(mutex->locked);
+    KASSERT(g_preemption_disabled);
+
+    cli();
+    /* re-nable preemption since we're about to wait */
+    g_preemption_disabled = false;
+    /* wait on the mutex's wait queue */
+    wait(&mutex->wait_queue);
+    /* back in action, so politely re-enable preemption */
+    g_preemption_disabled = true;
+    sti();
+}
+
+void mutex_init(mutex_t* mutex)
+{
+    mutex->locked = false;
+    mutex->owner = NULL;
+    thread_queue_clear(&mutex->wait_queue);
+}
+
+void mutex_lock(mutex_t* mutex)
+{
+    KASSERT(interrupts_enabled());
+
+    disable_preemption();
+
+    KASSERT(!mutex_held(mutex));
+
+    while (mutex->locked) {
+        mutex_wait(mutex);
+    }
+
+    mutex->locked = true;
+    mutex->owner = g_current_thread;
+
+    enable_preemption();
+}
+
+void mutex_unlock(mutex_t* mutex)
+{
+    KASSERT(interrupts_enabled());
+
+    disable_preemption();
+
+    KASSERT(mutex_held(mutex));
+
+    mutex->locked = false;
+    mutex->owner = NULL;
+
+    if (!thread_queue_empty(&mutex->wait_queue)) {
+        cli();
+        wake_one(&mutex->wait_queue);
+        sti();
+    }
+
+    enable_preemption();
+}
+
+bool mutex_held(mutex_t* mutex)
+{
+    if (mutex->locked && mutex->owner == g_current_thread) {
+        return true;
+    }
+    return false;
+}
+
+void disable_preemption(void)
+{
+    g_preemption_disabled = true;
+}
+
+void enable_preemption(void)
+{
+    g_preemption_disabled = false;
+}
+
+bool preemption_enabled(void)
+{
+    return !g_preemption_disabled;
 }

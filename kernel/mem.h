@@ -35,7 +35,7 @@ struct page {
 typedef struct page page_t;
 
 
-void mem_init(struct multiboot_info *mbinfo);
+void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kernend);
 void bss_init(void);
 
 void* alloc_page(void);

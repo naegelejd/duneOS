@@ -37,7 +37,7 @@ void timer_handler(struct regs *r)
     /* if the current thread has outlived the quantum, add it to the
      * run queue and schedule a new thread */
     thread_t* current = get_current_thread();
-    if (++current->num_ticks > THREAD_QUANTUM) {
+    if (++current->num_ticks > THREAD_QUANTUM && preemption_enabled()) {
         make_runnable(current);
         schedule();
     }

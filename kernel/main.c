@@ -42,6 +42,28 @@ void echo_input(uint32_t arg)
     exit(0);
 }
 
+uintptr_t load_mods(struct multiboot_info *mbinfo)
+{
+    uintptr_t end = 0;
+    if (mbinfo->mods_count > 0) {
+        multiboot_module_t *mod = (multiboot_module_t*)mbinfo->mods_addr;
+        unsigned int i;
+        for (i = 0; i < mbinfo->mods_count; i++) {
+            end = mod->mod_end;
+            kprintf("Mod start: 0x%x, Mod end: 0x%x, Cmd line: %s\n",
+                    mod->mod_start, mod->mod_end, (char*)mod->cmdline);
+            mod++;
+        }
+    }
+    return end;
+}
+
+void initrd_init(void* root, size_t size)
+{
+    //register_filesystem("initrd", &initrd_fs);
+    //mount_filesystem("/", root);
+}
+
 void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* interrupts are disabled */
@@ -63,7 +85,11 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     irq_install();
     kprintf("IRQ handlers installed\n");
     tss_init();
-    mem_init(mbinfo);
+
+    uintptr_t modsend = load_mods(mbinfo);
+    uintptr_t kend = (uintptr_t)(&g_end), kstart = (uintptr_t)(&g_start);
+    kend = (modsend > kend) ? modsend : kend;
+    mem_init(mbinfo, kstart, kend);
     kprintf("Memory manager and Heap initialized\n");
 
     /* re-enable interrupts */

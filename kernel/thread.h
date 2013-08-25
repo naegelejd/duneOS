@@ -33,14 +33,6 @@
 /* forward declaration for now */
 struct user_context;
 
-
-/* thread queues/lists */
-struct thread_queue {
-    struct kthread* head;
-    struct kthread* tail;
-};
-typedef struct thread_queue thread_queue_t;
-
 /* thread-local data */
 enum { MAX_TLOCAL_KEYS = 128 };
 typedef void (*tlocal_destructor_t)(void *);
@@ -58,15 +50,23 @@ enum priority {
 };
 typedef enum priority priority_t;
 
+/* thread queues/lists */
+struct thread_queue {
+    struct thread* head;
+    struct thread* tail;
+};
+typedef struct thread_queue thread_queue_t;
+
+
 /* kernel thread definition */
-struct kthread {
+struct thread {
     uint32_t esp;
     volatile uint32_t num_ticks;
     priority_t priority;
 
     void* stack_page;
     struct user_context* ucontext;
-    struct kthread* owner;
+    struct thread* owner;
     int refcount;
 
     /* sleep */
@@ -74,50 +74,71 @@ struct kthread {
 
     /* join()-related members */
     bool alive;
-    thread_queue_t join_queue;
+    struct thread_queue join_queue;
     int exit_code;
 
     /* kernel thread ID and process ID */
     unsigned int id;
 
     /* link to next thread in current queue */
-    struct kthread* queue_next;
+    struct thread* queue_next;
 
     /* link to all threads in system */
-    struct kthread* list_next;
+    struct thread* list_next;
 
     /* array of pointers to thread-local data */
     const void* tlocal_data[MAX_TLOCAL_KEYS];
 };
-typedef struct kthread thread_t;
+typedef struct thread thread_t;
 
 /* Thread start functions must match this signature. */
 typedef void (*thread_start_func_t)(uint32_t arg);
 
+struct mutex {
+    bool locked;
+    thread_t* owner;
+    thread_queue_t wait_queue;
+};
+typedef struct mutex mutex_t;
 
-/* Thread-local data functions */
-bool tlocal_create(tlocal_key_t* key, tlocal_destructor_t destructor);
-void tlocal_set(tlocal_key_t key, const void* data);
-void* tlocal_get(tlocal_key_t key);
 
-
-void sleep(unsigned int ticks);
 int join(thread_t* thread);
-void wait(thread_queue_t* wait_queue);
-void wake_all(thread_queue_t* wait_queue);
-void wake_one(thread_queue_t* wait_queue);
+void sleep(unsigned int ticks);
 void yield(void);
 //void exit(int exit_code) __attribute__ ((noreturn));
 void exit(int exit_code);
+
+void wait(thread_queue_t* wait_queue);
 void make_runnable(thread_t* thread);
 void make_runnable_atomic(thread_t* thread);
 
-thread_t* get_current_thread(void);
 thread_t* start_kernel_thread(thread_start_func_t start_function,
         uint32_t arg, priority_t priority, bool detached);
 
 void schedule(void);
 void scheduler_init();
+
 void dump_all_threads_list(void);
+
+void mutex_init(mutex_t* mutex);
+void mutex_lock(mutex_t* mutex);
+void mutex_unlock(mutex_t* mutex);
+bool mutex_held(mutex_t* mutex);
+
+void thread_queue_clear(thread_queue_t* queue);
+bool thread_queue_empty(thread_queue_t* queue);
+void wake_all(thread_queue_t* wait_queue);
+void wake_one(thread_queue_t* wait_queue);
+
+thread_t* get_current_thread(void);
+
+void disable_preemption(void);
+void enable_preemption(void);
+bool preemption_enabled(void);
+
+/* Thread-local data functions */
+bool tlocal_create(tlocal_key_t* key, tlocal_destructor_t destructor);
+void tlocal_set(tlocal_key_t key, const void* data);
+void* tlocal_get(tlocal_key_t key);
 
 #endif /* DUNE_THREAD_H */

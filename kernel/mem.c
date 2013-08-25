@@ -137,13 +137,8 @@ static void mark_page_range(uintptr_t start, uintptr_t end, uint32_t flags)
 }
 
 
-void mem_init(struct multiboot_info *mbinfo)
+void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kernend)
 {
-    extern char g_start, g_end;
-
-    uintptr_t kernel_start = (uintptr_t)&g_start;
-    uintptr_t kernel_end = (uintptr_t)&g_end;
-
     /* for now, require valid memory limits in multiboot info */
     KASSERT(mbinfo->flags & MULTIBOOT_INFO_MEMORY);
     uint32_t mem_upper = mbinfo->mem_upper * 1024;   /* mem_upper is in KB */
@@ -155,22 +150,22 @@ void mem_init(struct multiboot_info *mbinfo)
 
     /* align kernel_start down a page because technically the multiboot
      * header sits in front of the kernel's entry point */
-    kernel_start = page_align_down(kernel_start);
+    kernstart = page_align_down(kernstart);
 
     /* account for the size of the struct page array */
     uint32_t page_list_bytes = num_pages * sizeof(page_t);
-    kernel_end = page_align_up(kernel_end + page_list_bytes);
+    kernend = page_align_up(kernend + page_list_bytes);
 
-    uintptr_t heap_start = kernel_end;
-    uintptr_t heap_end = kernel_end + KERNEL_HEAP_SIZE;
+    uintptr_t heap_start = kernend;
+    uintptr_t heap_end = kernend + KERNEL_HEAP_SIZE;
 
     /* mark first page as unused */
     mark_page_range(0, PAGE_SIZE, PAGE_UNUSED);                      /* unused first page */
     //mark_page_range(PAGE_SIZE, HDWARE_RAM_START, PAGE_AVAIL);        /* extra RAM */
     mark_page_range(PAGE_SIZE, HDWARE_RAM_START, PAGE_KERN);        /* extra RAM */
-    mark_page_range(HDWARE_RAM_START, kernel_start, PAGE_HDWARE);    /* Extended BIOS and Video RAM */
-    mark_page_range(kernel_start, kernel_end, PAGE_KERN);            /* kernel pages */
-    mark_page_range(kernel_end, heap_end, PAGE_HEAP);                /* heap pages */
+    mark_page_range(HDWARE_RAM_START, kernstart, PAGE_HDWARE);    /* Extended BIOS and Video RAM */
+    mark_page_range(kernstart, kernend, PAGE_KERN);            /* kernel pages */
+    mark_page_range(kernend, heap_end, PAGE_HEAP);                /* heap pages */
     mark_page_range(heap_end, end_of_memory, PAGE_AVAIL);            /* available RAM */
 
 /*
