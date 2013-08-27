@@ -18,7 +18,7 @@ INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.h) $(wildcard $(KERNDIR)/*.asm)
 KERN_OBJS := $(addprefix $(OBJDIR)/,\
 	start.o main.o io.o gdt.o tss.o idt.o irq.o int.o bget.o mem.o \
-	paging.o thread.o blkdev.o \
+	paging.o thread.o blkdev.o initrd.o \
 	timer.o kb.o spkr.o rtc.o screen.o string.o print.o util.o)
 
 KERNEL = kernel.bin

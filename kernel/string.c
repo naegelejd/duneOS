@@ -43,3 +43,44 @@ int strlen(char *s)
     }
     return l;
 }
+
+int strcmp(const char* s1, const char* s2)
+{
+    while (*s1 || *s2) {
+        if (*s1 != *s2) {
+            return *s1 - *s2;
+        }
+        s1++;
+        s2++;
+    }
+
+    return 0;
+}
+
+int strncmp(const char* s1, const char* s2, size_t n)
+{
+    while (n-- & (*s1 || *s2)) {
+        if (*s1 != *s2) {
+            return *s1 - *s2;
+        }
+        s1++;
+        s2++;
+    }
+
+    return 0;
+}
+
+char* strcpy(char* dst, const char* src)
+{
+    while ((*dst++ = *src++))
+        ;
+    return dst;
+}
+
+char* strncpy(char* dst, const char* src, size_t n)
+{
+    while (n--) {
+        *dst++ = *src ? *src++ : '\0';
+    }
+    return dst;
+}
