@@ -199,7 +199,7 @@ static void init_thread(thread_t* thread, void* stack_page,
     thread_queue_clear(&thread->join_queue);
 
     thread->id = next_free_id++;
-    dbgprintf("New thread pid: %d\n", thread->id);
+    DEBUGF("New thread pid: %d\n", thread->id);
 }
 
 /*
@@ -212,14 +212,14 @@ static thread_t* create_thread(unsigned int priority, bool detached)
     void* stack_page = NULL;
 
     thread = alloc_page();
-    dbgprintf("Allocated page @ 0x%x for thread context\n", thread);
+    DEBUGF("Allocated page @ 0x%x for thread context\n", thread);
     if (!thread) {
         kprintf("Failed to allocate page for thread\n");
         return NULL;
     }
 
     stack_page = alloc_page();
-    dbgprintf("Allocated page @ 0x%x for thread stack\n", stack_page);
+    DEBUGF("Allocated page @ 0x%x for thread stack\n", stack_page);
     if (!stack_page) {
         kprintf("Failed to allocate page for thread stack\n");
         free_page(thread);
@@ -342,7 +342,7 @@ static void setup_kernel_thread(thread_t* thread,
 static void idle(uint32_t arg)
 {
     (void)arg; /* prevent compiler warnings */
-    dbgprintf("Idle thread idling\n");
+    DEBUG("Idle thread idling\n");
     while (true) {
         yield();
     }
@@ -370,7 +370,7 @@ static void reaper(uint32_t arg)
 
             while (thread != 0) {
                 thread_t* next = thread->queue_next;
-                dbgprintf("Reaper destroying thread: 0x%x\n", thread);
+                DEBUGF("Reaper destroying thread: 0x%x\n", thread);
                 destroy_thread(thread);
                 thread = next;
             }
@@ -621,7 +621,6 @@ void schedule(void)
 
     thread_t* runnable = get_next_runnable();
 
-    //dbgprintf("Switching to thread 0x%x\n", runnable);
     switch_to_thread(runnable);
 }
 

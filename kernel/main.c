@@ -10,6 +10,8 @@
 #include "kb.h"
 #include "rtc.h"
 #include "timer.h"
+#include "blkdev.h"
+#include "initrd.h"
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 
@@ -42,26 +44,28 @@ void echo_input(uint32_t arg)
     exit(0);
 }
 
-uintptr_t load_mods(struct multiboot_info *mbinfo)
+struct modinfo {
+    uintptr_t start;
+    uintptr_t end;
+};
+
+uintptr_t load_mods(struct multiboot_info *mbinfo, struct modinfo *initrd_info)
 {
     uintptr_t end = 0;
     if (mbinfo->mods_count > 0) {
         multiboot_module_t *mod = (multiboot_module_t*)mbinfo->mods_addr;
+        initrd_info->start = mod->mod_start;
+        initrd_info->end = mod->mod_end;
+
         unsigned int i;
         for (i = 0; i < mbinfo->mods_count; i++) {
             end = mod->mod_end;
-            kprintf("Mod start: 0x%x, Mod end: 0x%x, Cmd line: %s\n",
+            DEBUGF("Mod start: 0x%x, Mod end: 0x%x, Cmd line: %s\n",
                     mod->mod_start, mod->mod_end, (char*)mod->cmdline);
             mod++;
         }
     }
     return end;
-}
-
-void initrd_init(void* root, size_t size)
-{
-    //register_filesystem("initrd", &initrd_fs);
-    //mount_filesystem("/", root);
 }
 
 void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
@@ -86,7 +90,8 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("IRQ handlers installed\n");
     tss_init();
 
-    uintptr_t modsend = load_mods(mbinfo);
+    struct modinfo initrd_info;
+    uintptr_t modsend = load_mods(mbinfo, &initrd_info);
     uintptr_t kend = (uintptr_t)(&g_end), kstart = (uintptr_t)(&g_start);
     kend = (modsend > kend) ? modsend : kend;
     mem_init(mbinfo, kstart, kend);
@@ -95,8 +100,20 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* re-enable interrupts */
     sti();
 
+    timer_install();
+    keyboard_install();
+    rtc_install();
+
     scheduler_init();
     kprintf("Scheduler initialized\n");
+
+    if (initrd_info.start || initrd_info.end) {
+        size_t len = (char*)initrd_info.end - (char*)initrd_info.start;
+        kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n",
+                initrd_info.start, len);
+        block_device_t* initrd = ramdisk_init(initrd_info.start, len);
+        (void)initrd;
+    }
 
     /* paging_install(&g_end); */
     /* kprintf("Paging enabled\n"); */
@@ -107,10 +124,6 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     new[strlen(tmp)] = '\0';
     kprintf("%s", new);
     free(new);
-
-    timer_install();
-    keyboard_install();
-    rtc_install();
 
     /* start thread to print date/time on screen */
     thread_t* date_printer = start_kernel_thread(

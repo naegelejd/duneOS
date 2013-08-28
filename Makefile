@@ -26,7 +26,7 @@ ISO = Dune32.iso
 GRUB_CFG = grub.cfg
 
 QEMU = qemu-system-i386
-QARGS = -m 32 -debugcon stdio
+QARGS = -m 32 -initrd README.md -debugcon stdio
 
 .PHONY: all
 all: $(KERNEL)

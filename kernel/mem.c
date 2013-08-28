@@ -118,7 +118,7 @@ static void mark_page_range(uintptr_t start, uintptr_t end, uint32_t flags)
         default:
             flagname = "BAD FLAG";
     }
-    dbgprintf("Add range: 0x%x - 0x%x - %s\n", start, end, flagname);
+    DEBUGF("Add range: 0x%x - 0x%x - %s\n", start, end, flagname);
     KASSERT(is_page_aligned(start));
     KASSERT(is_page_aligned(end));
     KASSERT(start < end);
@@ -142,11 +142,11 @@ void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kern
     /* for now, require valid memory limits in multiboot info */
     KASSERT(mbinfo->flags & MULTIBOOT_INFO_MEMORY);
     uint32_t mem_upper = mbinfo->mem_upper * 1024;   /* mem_upper is in KB */
-    dbgprintf("Mem low: 0x%x, Mem high: 0x%x\n", mbinfo->mem_lower * 1024, mem_upper);
+    DEBUGF("Mem low: 0x%x, Mem high: 0x%x\n", mbinfo->mem_lower * 1024, mem_upper);
 
     uint32_t num_pages = mem_upper / PAGE_SIZE;
     uintptr_t end_of_memory = num_pages * PAGE_SIZE;
-    dbgprintf("Number of pages: %u\n", num_pages);
+    DEBUGF("Number of pages: %u\n", num_pages);
 
     /* align kernel_start down a page because technically the multiboot
      * header sits in front of the kernel's entry point */
@@ -194,7 +194,7 @@ void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kern
     }
 */
     /* initialize the kernel's heap */
-    dbgprintf("Creating kernel heap: start=0x%x, size=0x%x\n", heap_start, KERNEL_HEAP_SIZE);
+    DEBUGF("Creating kernel heap: start=0x%x, size=0x%x\n", heap_start, KERNEL_HEAP_SIZE);
     bpool((void*) heap_start, KERNEL_HEAP_SIZE);
 }
 
@@ -237,7 +237,7 @@ void bss_init(void)
     uintptr_t bss_end = (uintptr_t)&g_end;
 
     /* zero BSS section */
-    dbgprintf("BSS: 0x%x: %u\n", bss_start, bss_end - bss_start);
+    DEBUGF("BSS: 0x%x: %u\n", bss_start, bss_end - bss_start);
     memset((void*)bss_start, 0, bss_end - bss_start);
 }
 

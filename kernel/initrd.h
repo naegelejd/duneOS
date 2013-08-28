@@ -1,11 +1,15 @@
 #ifndef DUNE_INITRD_H
 #define DUNE_INITRD_H
 
+#include "dune.h"
+#include "blkdev.h"
+
 struct ramdisk {
-    void* start_addr;
-    size_t length;
+    uintptr_t start_addr;
+    uintptr_t end_addr;
+    size_t length;  /* convenience */
 };
 
-void ramdisk_init(void* start, size_t len);
+block_device_t* ramdisk_init(uintptr_t start, size_t len);
 
 #endif /* DUNE_INITRD_H */

@@ -11,10 +11,21 @@ size_t ksprintf(char *s, char *fmt, ...);
 
 #ifdef QEMU_DEBUG
 
+#define DEBUG(s) \
+    do { \
+        dbgprintf("%s:%u: " s, __FILE__, __LINE__); \
+    } while (0)
+
+#define DEBUGF(fmt, ...) \
+    do { \
+        dbgprintf("%s:%u: " fmt, __FILE__, __LINE__, __VA_ARGS__); \
+    } while (0)
+
 /* print a formatted string to QEMU's debug console */
 size_t dbgprintf(char *fmt, ...);
 
 #else /* QEMU_DEBUG */
+#   define DEBUG(...)
 #   define dbgprintf(...)
 #endif /* QEMU_DEBUG */
 
