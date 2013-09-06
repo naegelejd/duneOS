@@ -7,6 +7,10 @@
  * http://www.nongnu.org/ext2-doc/ext2.html
  */
 
+enum { EXT2_MIN_BLOCK_SIZE = 1024 };
+enum { EXT2_SUPERBLOCK_LOCATION = 1024 };
+enum { EXT2_SUPER_MAGIC = 0xEF53 };
+
 enum ext2_s_state { EXT2_VALID_FS = 1, EXT2_ERROR_FS };
 enum ext2_s_errors { EXT2_ERRORS_CONTINUE = 1, EXT2_ERRORS_RO, EXT2_ERRORS_PANIC };
 enum ext2_s_creator_os { EXT2_OS_LINUX, EXT2_OS_HURD, EXT2_OS_MASIX, EXT2_OS_FREEBSD, EXT2_OS_LITES };
@@ -105,7 +109,7 @@ enum ext2_file_type {
     EXT2_FT_SYMLINK = 7 /* Symbolic Link */
 };
 
-struct superblock {
+struct ext2_superblock {
     /* total number of inodes */
     uint32_t s_inodes_count;
     /* total number of blocks */
@@ -137,7 +141,7 @@ struct superblock {
     uint16_t s_mnt_count;
     /* number of mounts allowed before full check required */
     uint16_t s_max_mnt_count;
-    /* ext2 magic (EXT2_SUPER_MAGIC = 0xEF53) */
+    /* ext2 magic */
     uint16_t s_magic;
     /* filesystem state (valid/error) */
     uint16_t s_state;
@@ -170,7 +174,7 @@ struct superblock {
     /* bitmask of 'read-only' features */
     uint32_t s_feature_ro_compat;
     /* volume id (unique as possible) */
-    uint8_t s_uuid[32];
+    uint32_t s_uuid[4];
     /* volume name (mostly unused - ISO-Latin-1, nul terminated */
     char s_volume_name[16];
     /* directory path where file system was last mounted */
@@ -182,7 +186,7 @@ struct superblock {
     /* number of blocks to attempt to pre-allocate for new directory */
     uint8_t s_prealloc_dir_blocks;
     /* uuid of the journal superblock */
-    uint8_t s_journal_uuid[16];
+    uint32_t s_journal_uuid[4];
     /* inode number of journal file */
     uint32_t s_journal_inum;
     /* device number of journal file */
@@ -212,7 +216,7 @@ struct superblock {
  *
  * Inode Bitmap - Each bit represents current state of inode within Inode Table.
  *  When Inode Table is created, all reserved inodes are marked used (first 11). */
-struct block_group_descriptor {
+struct ext2_block_group_descr {
     /* block ID of first block of the "block bitmap" for this group */
     uint32_t bg_block_bitmap;
     /* block ID of first block of the "inode bitmap" for this group */
@@ -243,7 +247,7 @@ struct block_group_descriptor {
  *
  * local_inode_index = (inode - 1) % s_inodes_per_group
  */
-struct inode {
+struct ext2_inode {
     /* format of the described file and access rights */
     uint16_t i_mode;
     /* user id associated with file */
@@ -286,7 +290,7 @@ struct inode {
     uint8_t i_osd2[12];
 };
 
-struct directory_entry {
+struct ext2_dir_entry {
     /* inode number of the file entry */
     uint32_t inode;
     /* displacement to next directory entry from start of this entry
