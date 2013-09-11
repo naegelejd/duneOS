@@ -56,6 +56,17 @@ int main(int argc, char** argv)
     struct ext2_superblock sb;
     populate_superblock(&sb, image_size, image_block_size);
 
+    unsigned int n_block_groups = sb.s_blocks_count / sb.s_blocks_per_group;
+    unsigned int block_group_size = sb.s_blocks_per_group * image_block_size;
+
+    size_t block_group_descr_table_size =
+            n_block_groups * sizeof(struct ext2_block_group_descr);
+    struct ext2_block_group_descr *block_group_descr_table =
+            malloc(block_group_descr_table_size);
+    if (block_group_descr_table == NULL) {
+        DIE("Failed to allocate block group descriptor table\n");
+    }
+
     DEBUG("Seeking to first superblock\n");
     if (fseek(fp, 1024, SEEK_SET) != 0) {
         DIE("Failed to seek to first superblock\n");
@@ -64,6 +75,27 @@ int main(int argc, char** argv)
     DEBUG("Writing first superblock\n");
     if (fwrite(&sb, sizeof(sb), 1, fp) != 1) {
         DIE("Failed to write superblock\n");
+    }
+
+    unsigned int bg = 0;
+    long fpos = 0;
+    for (bg = 1; bg < n_block_groups; bg++) {
+        fpos = bg * block_group_size;
+        if (fseek(fp, fpos, SEEK_SET) != 0) {
+            DIE("Failed to seek to first superblock\n");
+        }
+        if (fwrite(&sb, sizeof(sb), 1, fp) != 1) {
+            DIE("Failed to write superblock\n");
+        }
+
+        fpos += image_block_size;
+        if (fseek(fp, fpos, SEEK_SET) != 0) {
+            DIE("Failed to seek to first superblock\n");
+        }
+        if (fwrite(&sb, block_group_descr_table_size, 1, fp) != 1) {
+            DIE("Failed to write superblock\n");
+        }
+
     }
 
     if (fclose(fp) != 0) {
@@ -86,19 +118,10 @@ static unsigned int logtwo(unsigned int num)
     return p;
 }
 
-static bool ispowerof(unsigned int num, unsigned int base)
-{
-    while (num % base == 0) {
-        num /= base;
-    }
-    return num == 1;
-}
-
 static void populate_superblock(struct ext2_superblock *sb,
         long image_size, long block_size)
 {
-    unsigned int usable_blocks = (unsigned int)(
-            image_size / block_size * block_size);
+    unsigned int usable_blocks = (unsigned int)(image_size / block_size);
 
     sb->s_blocks_count = usable_blocks;
     sb->s_r_blocks_count = usable_blocks / 32;
@@ -110,25 +133,25 @@ static void populate_superblock(struct ext2_superblock *sb,
     sb->s_inodes_per_group = 8 * block_size; /* max inodes per group */
 
     /* slightly out of order w/ respect to superblock definition */
-    unsigned int num_block_groups = sb->s_blocks_per_group * sb->s_blocks_count;
-    unsigned int bg = 0;
-    unsigned int num_copy_groups = 0;
-    for (bg = 0; bg < num_block_groups; bg++) {
-        if (ispowerof(bg, 3)) {
-            num_copy_groups++;
-        } else if (ispowerof(bg, 5)) {
-            num_copy_groups++;
-        } else if (ispowerof(bg, 7)) {
-            num_copy_groups++;
-        }
-    }
+    unsigned int num_block_groups = sb->s_blocks_count / sb->s_blocks_per_group;
+    unsigned int block_group_descr_table_size = num_block_groups *
+            sizeof(struct ext2_block_group_descr);
+    unsigned int block_group_size = sb->s_blocks_per_group * block_size;
+
+    DEBUG("Number of blocks: %u\n", sb->s_blocks_count);
+    DEBUG("Number of block groups: %u\n", num_block_groups);
+    DEBUG("Size of block group descriptor table: %u\n",
+            block_group_descr_table_size);
+    DEBUG("Size of block group: %u\n", block_group_size);
 
     sb->s_inodes_count = sb->s_inodes_per_group * num_block_groups;
-    /* this is probably very wrong.
-     * free blocks are all blocks except superblock,
-     * block group descriptor table, inode table and
-     * copies of superblocks */
-    sb->s_free_blocks_count = sb->s_first_data_block + 1 + num_copy_groups;
+
+    /* TODO: update this to account for all USED blocks:
+     * super block and each copy
+     * block group descriptor table and all copies
+     * each inode table
+     */
+    sb->s_free_blocks_count = sb->s_blocks_count;
 
     /* free inodes - skipping first 11 inodes in each block group */
     sb->s_free_inodes_count = sb->s_inodes_count - (

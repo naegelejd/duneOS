@@ -185,6 +185,8 @@ struct ext2_superblock {
     uint8_t s_prealloc_blocks;
     /* number of blocks to attempt to pre-allocate for new directory */
     uint8_t s_prealloc_dir_blocks;
+    /* alignment */
+    uint8_t alignment[2];
     /* uuid of the journal superblock */
     uint32_t s_journal_uuid[4];
     /* inode number of journal file */
@@ -197,10 +199,14 @@ struct ext2_superblock {
     uint32_t s_hash_seed[4];
     /* default hash version for directory indexing */
     uint8_t s_def_hash_version;
+    /* reserved */
+    uint8_t reserved[3];
     /* default mount options for this file system */
     uint32_t s_default_mount_options;
     /* block group ID of first meta block group (ext3 only?) */
     uint32_t s_first_meta_bg;
+    /* unused */
+    uint8_t unused[760];
 };
 
 /* The Block Group Descriptor Table is an array of block group descriptors
