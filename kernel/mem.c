@@ -4,10 +4,10 @@
 #include "mem.h"
 
 
-static page_t* g_page_list;
+static page_t* g_page_array = NULL;
 
-static page_t* g_free_page_head;
-static page_t* g_free_page_tail;
+static page_t* g_free_page_head = NULL;
+static page_t* g_free_page_tail = NULL;
 static unsigned int g_free_page_count;
 
 /*
@@ -36,18 +36,18 @@ static uintptr_t page_align_down(uintptr_t addr)
 
 static unsigned int page_index(uintptr_t addr)
 {
-    return addr >> PAGE_POWER;
+    return (addr - KERNEL_VBASE) >> PAGE_POWER;
 }
 
 static page_t* page_from_addr(uintptr_t addr)
 {
-    return &g_page_list[page_index(addr)];
+    return &g_page_array[page_index(addr)];
 }
 
 static uintptr_t addr_from_page(page_t *page)
 {
-    unsigned int index = page - g_page_list;
-    return index << PAGE_POWER;
+    unsigned int index = page - g_page_array;
+    return (index << PAGE_POWER) + KERNEL_VBASE;
 }
 
 static page_t* freelist_get_page()
@@ -145,7 +145,6 @@ void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kern
     DEBUGF("Mem low: 0x%x, Mem high: 0x%x\n", mbinfo->mem_lower * 1024, mem_upper);
 
     uint32_t num_pages = mem_upper / PAGE_SIZE;
-    uintptr_t end_of_memory = num_pages * PAGE_SIZE;
     DEBUGF("Number of pages: %u\n", num_pages);
 
     /* align kernel_start down a page because technically the multiboot
@@ -153,20 +152,28 @@ void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kern
     kernstart = page_align_down(kernstart);
 
     /* account for the size of the struct page array */
-    uint32_t page_list_bytes = num_pages * sizeof(page_t);
-    kernend = page_align_up(kernend + page_list_bytes);
+    uint32_t page_array_bytes = num_pages * sizeof(page_t);
+    g_page_array = (page_t*)(kernend);     /* make room for page list */
 
+    /* move kernel end past the page_t array */
+    kernend = page_align_up(kernend + page_array_bytes);
+
+    uintptr_t mem_start = KERNEL_VBASE;
+    uintptr_t first_page = PAGE_SIZE + KERNEL_VBASE;
+    uintptr_t hdware_start = HDWARE_RAM_START + KERNEL_VBASE;
     uintptr_t heap_start = kernend;
     uintptr_t heap_end = kernend + KERNEL_HEAP_SIZE;
+    uintptr_t end_of_memory = num_pages * PAGE_SIZE + KERNEL_VBASE;
 
-    /* mark first page as unused */
-    mark_page_range(0, PAGE_SIZE, PAGE_UNUSED);                      /* unused first page */
-    //mark_page_range(PAGE_SIZE, HDWARE_RAM_START, PAGE_AVAIL);        /* extra RAM */
-    mark_page_range(PAGE_SIZE, HDWARE_RAM_START, PAGE_KERN);        /* extra RAM */
-    mark_page_range(HDWARE_RAM_START, kernstart, PAGE_HDWARE);    /* Extended BIOS and Video RAM */
-    mark_page_range(kernstart, kernend, PAGE_KERN);            /* kernel pages */
-    mark_page_range(kernend, heap_end, PAGE_HEAP);                /* heap pages */
-    mark_page_range(heap_end, end_of_memory, PAGE_AVAIL);            /* available RAM */
+    /* unused first page */
+    mark_page_range(mem_start, first_page, PAGE_UNUSED);
+    /* extra RAM */
+    mark_page_range(first_page, hdware_start, PAGE_KERN);
+    /* Extended BIOS and Video RAM */
+    mark_page_range(hdware_start, kernstart, PAGE_HDWARE);
+    mark_page_range(kernstart, kernend, PAGE_KERN);         /* kernel pages */
+    mark_page_range(kernend, heap_end, PAGE_HEAP);          /* heap pages */
+    mark_page_range(heap_end, end_of_memory, PAGE_AVAIL);   /* available RAM */
 
 /*
     if (mbinfo->flags & MULTIBOOT_INFO_MEM_MAP) {

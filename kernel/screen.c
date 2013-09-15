@@ -2,19 +2,6 @@
 #include "string.h"
 #include "io.h"
 
-#define VIDEO_ADDR      0xb8000
-#define VIDEO_ROWS      25
-#define VIDEO_COLS      80
-
-/* Screen device I/O ports */
-#define REG_SCREEN_CTRL     0x3D4
-#define REG_SCREEN_DATA     0x3D5
-#define REG_CURSOR_LOW      0x0F
-#define REG_CURSOR_HIGH     0x0E
-
-#define WHITE_ON_BLACK      0x0F
-#define WHITE_ON_RED        0x4F
-
 /* global attribute for all chars printed to console */
 static uint8_t g_attr = WHITE_ON_BLACK;
 

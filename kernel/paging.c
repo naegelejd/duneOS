@@ -1,5 +1,15 @@
 #include "paging.h"
 
+uintptr_t phys_to_virt(uintptr_t phys)
+{
+    return phys + KERNEL_VBASE;
+}
+
+uintptr_t virt_to_phys(uintptr_t virt)
+{
+    return virt - KERNEL_VBASE;
+}
+
 void paging_install(uintptr_t end)
 {
     /* find first 4KB aligned address after the end of the kernel */

@@ -33,7 +33,7 @@ QARGS = -m 32 -initrd README.md -debugcon stdio
 all: $(KERNEL)
 
 $(KERNEL): $(KERN_OBJS)
-	$(CC) $(CFLAGS) -o $@ -T $(KERNDIR)/link.ld $^ $(LFLAGS)
+	$(CC) $(CFLAGS) -o $@ -T $(KERNDIR)/linker.ld $^ $(LFLAGS)
 
 $(OBJDIR)/%.o: $(KERNDIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@

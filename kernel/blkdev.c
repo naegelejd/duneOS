@@ -25,6 +25,7 @@ static void all_devices_remove(block_device_t* dev)
     while (*d) {
         if (dev == *d) {
             *d = (*d)->next;
+            return;
         }
         d = &(*d)->next;
     }

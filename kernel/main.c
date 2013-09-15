@@ -28,8 +28,6 @@ void print_date(uint32_t arg)
         kprintf("%02u:%02u:%02u %s %02u, %04u\n", dt.hour, dt.min, dt.sec,
                 month_name(dt.month), dt.mday, dt.year);
         kset_cursor(row, col);
-
-        arg--;
     }
     exit(0);
 }
@@ -74,6 +72,7 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     kcls();
     kprintf("Welcome to DuneOS...\n\n");
+
     if (mboot_magic == MULTIBOOT_BOOTLOADER_MAGIC) {
         kprintf("Multiboot Successful\n");
     } else {
@@ -91,9 +90,9 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     tss_init();
 
     struct modinfo initrd_info;
-    uintptr_t modsend = load_mods(mbinfo, &initrd_info);
+    //uintptr_t modsend = load_mods(mbinfo, &initrd_info);
     uintptr_t kend = (uintptr_t)(&g_end), kstart = (uintptr_t)(&g_start);
-    kend = (modsend > kend) ? modsend : kend;
+    //kend = (modsend > kend) ? modsend : kend;
     mem_init(mbinfo, kstart, kend);
     kprintf("Memory manager and Heap initialized\n");
 
@@ -107,13 +106,13 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     scheduler_init();
     kprintf("Scheduler initialized\n");
 
-    if (initrd_info.start || initrd_info.end) {
-        size_t len = (char*)initrd_info.end - (char*)initrd_info.start;
-        kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n",
-                initrd_info.start, len);
-        block_device_t* initrd = ramdisk_init(initrd_info.start, len);
-        (void)initrd;
-    }
+    /* if (initrd_info.start || initrd_info.end) { */
+    /*     size_t len = (char*)initrd_info.end - (char*)initrd_info.start; */
+    /*     kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n", */
+    /*             initrd_info.start, len); */
+    /*     block_device_t* initrd = ramdisk_init(initrd_info.start, len); */
+    /*     (void)initrd; */
+    /* } */
 
     /* paging_install(&g_end); */
     /* kprintf("Paging enabled\n"); */

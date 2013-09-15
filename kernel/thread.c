@@ -48,7 +48,7 @@ static thread_queue_t graveyard_queue;
 static thread_queue_t reaper_wait_queue;
 
 /* global, currently-running thread */
-thread_t *g_current_thread;
+thread_t *g_current_thread = NULL;
 
 /* When set, interrupts will not cause a new thread to be scheduled */
 static volatile bool g_preemption_disabled;
@@ -66,6 +66,8 @@ static tlocal_destructor_t tlocal_destructors[MAX_TLOCAL_KEYS];
  */
 static void all_threads_add(thread_t* thread)
 {
+    KASSERT(thread);
+
     if (all_threads.head == NULL) {
         all_threads.head = thread;
     } else if (all_threads.tail != NULL) {
@@ -80,10 +82,12 @@ static void all_threads_add(thread_t* thread)
  */
 static void all_threads_remove(thread_t* thread)
 {
+    KASSERT(thread);
     thread_t** t = &all_threads.head;
     while (*t) {
         if (thread == *t) {
             *t = (*t)->list_next;
+            return;
         }
         t = &(*t)->list_next;
     }
@@ -95,12 +99,14 @@ static void all_threads_remove(thread_t* thread)
  */
 void thread_queue_clear(thread_queue_t* queue)
 {
+    KASSERT(queue);
     queue->head = NULL;
     queue->tail = NULL;
 }
 
 bool thread_queue_empty(thread_queue_t* queue)
 {
+    KASSERT(queue);
     if (queue->head == NULL && queue->tail == NULL) {
         return true;
     }
@@ -112,6 +118,9 @@ bool thread_queue_empty(thread_queue_t* queue)
  */
 static void enqueue_thread(thread_queue_t* queue, thread_t* thread)
 {
+    KASSERT(queue);
+    KASSERT(thread);
+
     if (queue->head == NULL) {
         queue->head = thread;
     } else if (queue->tail != NULL) {
@@ -128,10 +137,15 @@ static void enqueue_thread(thread_queue_t* queue, thread_t* thread)
  */
 static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
 {
+    KASSERT(queue);
+    KASSERT(queue->head);
+    KASSERT(thread);
+
     thread_t** t = &queue->head;
     while (*t) {
         if (thread == *t) {
             *t = (*t)->queue_next;
+            return;
         }
         t = &(*t)->queue_next;
     }
@@ -145,6 +159,7 @@ static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
 static void tlocal_exit(thread_t* thread)
 {
     KASSERT(!interrupts_enabled());
+    KASSERT(thread);
 
     bool repeat = false;
     do {
@@ -239,6 +254,7 @@ static thread_t* create_thread(unsigned int priority, bool detached)
  */
 static void destroy_thread(thread_t* thread)
 {
+    KASSERT(thread);
     cli();
     free_page(thread->stack_page);
     free_page(thread);
@@ -255,6 +271,7 @@ static void destroy_thread(thread_t* thread)
 static void reap_thread(thread_t* thread)
 {
     KASSERT(!interrupts_enabled());
+    KASSERT(thread);
     enqueue_thread(&graveyard_queue, thread);
     wake_all(&reaper_wait_queue);
 }
@@ -265,6 +282,7 @@ static void reap_thread(thread_t* thread)
 static void detach_thread(thread_t* thread)
 {
     KASSERT(!interrupts_enabled());
+    KASSERT(thread);
     KASSERT(thread->refcount > 0);
 
     --thread->refcount;
@@ -386,8 +404,8 @@ static void reaper(uint32_t arg)
  */
 static void wake_sleepers(void)
 {
-    thread_t* thread = sleep_queue.head;
     thread_t* next = NULL;
+    thread_t* thread = sleep_queue.head;
 
     while (thread) {
         next = thread->queue_next;
@@ -410,13 +428,14 @@ static void wake_sleepers(void)
  */
 static thread_t* find_best(thread_queue_t* queue)
 {
+    KASSERT(queue);
     return queue->head;
 }
 
 static thread_t* get_next_runnable(void)
 {
     thread_t* best = find_best(&run_queue);
-    KASSERT(best != NULL);
+    KASSERT(best);
     dequeue_thread(&run_queue, best);
 
     return best;
@@ -461,6 +480,7 @@ void* tlocal_get(tlocal_key_t key)
 
 void yield(void)
 {
+    KASSERT(g_current_thread);
     cli();
     make_runnable(g_current_thread);
     schedule();
@@ -473,6 +493,7 @@ void yield(void)
 void exit(int exit_code)
 {
     thread_t* current = g_current_thread;
+    KASSERT(current);
 
     if (interrupts_enabled()) {
         cli();
@@ -507,6 +528,7 @@ int join(thread_t* thread)
 {
     KASSERT(interrupts_enabled());
 
+    KASSERT(thread);
     /* only the owner can join on a thread */
     KASSERT(thread->owner = g_current_thread);
 
@@ -534,6 +556,8 @@ int join(thread_t* thread)
  */
 void sleep(unsigned int ticks)
 {
+    KASSERT(g_current_thread);
+
     cli();
     g_current_thread->sleep_until = get_ticks() + ticks;
     enqueue_thread(&sleep_queue, g_current_thread);
@@ -548,6 +572,8 @@ void sleep(unsigned int ticks)
 void wait(thread_queue_t* wait_queue)
 {
     KASSERT(!interrupts_enabled());
+    KASSERT(wait_queue);
+    KASSERT(g_current_thread);
 
     enqueue_thread(wait_queue, g_current_thread);
 
@@ -591,6 +617,7 @@ void wake_one(thread_queue_t* wait_queue)
 void make_runnable(thread_t* thread)
 {
     KASSERT(!interrupts_enabled());
+    KASSERT(thread);
     enqueue_thread(&run_queue, thread);
 }
 
@@ -600,6 +627,8 @@ void make_runnable(thread_t* thread)
  */
 void make_runnable_atomic(thread_t* thread)
 {
+    KASSERT(thread);
+
     cli();
     make_runnable(thread);
     sti();
@@ -621,6 +650,9 @@ void schedule(void)
 
     thread_t* runnable = get_next_runnable();
 
+    KASSERT(runnable);
+    KASSERT(g_current_thread);
+
     switch_to_thread(runnable);
 }
 
@@ -632,9 +664,11 @@ void schedule(void)
 thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
         priority_t priority, bool detached)
 {
-    thread_t* thread = create_thread(priority, detached);
+    KASSERT(start_function);
 
-    KASSERT(thread != NULL);    /* was thread created? */
+    thread_t* thread = create_thread(priority, detached);
+    KASSERT(thread);    /* was thread created? */
+
     if (thread) {
         setup_kernel_thread(thread, start_function, arg);
 
@@ -653,6 +687,7 @@ void scheduler_init(void)
 {
     extern char main_thread_addr, kernel_stack_bottom;
     thread_t* main_thread = (thread_t*)&main_thread_addr;
+    KASSERT(main_thread);
 
     init_thread(main_thread, (void*)&kernel_stack_bottom, PRIORITY_NORMAL, true);
     g_current_thread = main_thread;
@@ -662,6 +697,19 @@ void scheduler_init(void)
 
     start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
 }
+
+
+void dump_thread_info(thread_t* th)
+{
+    KASSERT(th);
+    DEBUGF("esp: 0x%X\n", th->esp);
+    DEBUGF("num_ticks: %u\n", th->num_ticks);
+    DEBUGF("stack_page: 0x%0X\n", th->stack_page);
+    DEBUGF("sleep_until: %u\n", th->sleep_until);
+    DEBUGF("queue_next: 0x%0X\n", th->queue_next);
+    DEBUGF("list_next: 0x%0X\n", th->list_next);
+}
+
 /*
  * Dumps debugging data for each thread in the list of all threads
  */
@@ -696,6 +744,7 @@ thread_t* get_current_thread(void)
 
 static void mutex_wait(mutex_t *mutex)
 {
+    KASSERT(mutex);
     KASSERT(mutex->locked);
     KASSERT(g_preemption_disabled);
 
@@ -711,6 +760,7 @@ static void mutex_wait(mutex_t *mutex)
 
 void mutex_init(mutex_t* mutex)
 {
+    KASSERT(mutex);
     mutex->locked = false;
     mutex->owner = NULL;
     thread_queue_clear(&mutex->wait_queue);
@@ -719,6 +769,7 @@ void mutex_init(mutex_t* mutex)
 void mutex_lock(mutex_t* mutex)
 {
     KASSERT(interrupts_enabled());
+    KASSERT(mutex);
 
     disable_preemption();
 
@@ -737,6 +788,7 @@ void mutex_lock(mutex_t* mutex)
 void mutex_unlock(mutex_t* mutex)
 {
     KASSERT(interrupts_enabled());
+    KASSERT(mutex);
 
     disable_preemption();
 
@@ -756,6 +808,7 @@ void mutex_unlock(mutex_t* mutex)
 
 bool mutex_held(mutex_t* mutex)
 {
+    KASSERT(mutex);
     if (mutex->locked && mutex->owner == g_current_thread) {
         return true;
     }

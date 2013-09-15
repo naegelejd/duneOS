@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define KERNEL_VBASE 0xC0000000
+
 #include "assert.h"
 #include "print.h"
 

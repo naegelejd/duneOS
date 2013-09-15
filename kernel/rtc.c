@@ -38,8 +38,8 @@ char* day_name(uint8_t wday)
 
 char* month_name(uint8_t mon)
 {
-    if (mon > 12) {
-        return NULL;
+    if (mon < 1 || mon > 12) {
+        return "?";
     }
     return months[mon - 1];
 }

@@ -118,6 +118,7 @@ thread_t* start_kernel_thread(thread_start_func_t start_function,
 void schedule(void);
 void scheduler_init();
 
+void dump_thread_info(thread_t*);
 void dump_all_threads_list(void);
 
 void mutex_init(mutex_t* mutex);
