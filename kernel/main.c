@@ -5,6 +5,7 @@
 #include "idt.h"
 #include "irq.h"
 #include "mem.h"
+#include "paging.h"
 #include "thread.h"
 #include "tss.h"
 #include "kb.h"
@@ -49,17 +50,18 @@ struct modinfo {
 
 uintptr_t load_mods(struct multiboot_info *mbinfo, struct modinfo *initrd_info)
 {
-    uintptr_t end = 0;
+    uintptr_t start = 0, end = 0;
     if (mbinfo->mods_count > 0) {
-        multiboot_module_t *mod = (multiboot_module_t*)mbinfo->mods_addr;
-        initrd_info->start = mod->mod_start;
-        initrd_info->end = mod->mod_end;
+        multiboot_module_t *mod = (multiboot_module_t*)phys_to_virt(mbinfo->mods_addr);
+        initrd_info->start = phys_to_virt(mod->mod_start);
+        initrd_info->end = phys_to_virt(mod->mod_end);
 
         unsigned int i;
         for (i = 0; i < mbinfo->mods_count; i++) {
-            end = mod->mod_end;
+            start = phys_to_virt(mod->mod_start);
+            end = phys_to_virt(mod->mod_end);
             DEBUGF("Mod start: 0x%x, Mod end: 0x%x, Cmd line: %s\n",
-                    mod->mod_start, mod->mod_end, (char*)mod->cmdline);
+                    start, end, (char*)phys_to_virt(mod->cmdline));
             mod++;
         }
     }
@@ -90,10 +92,10 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     tss_init();
 
     struct modinfo initrd_info;
-    //uintptr_t modsend = load_mods(mbinfo, &initrd_info);
+    uintptr_t modsend = load_mods(mbinfo, &initrd_info);
     uintptr_t kend = (uintptr_t)(&g_end), kstart = (uintptr_t)(&g_start);
-    //kend = (modsend > kend) ? modsend : kend;
-    mem_init(mbinfo, kstart, kend);
+    kend = (modsend > kend) ? modsend : kend;
+    kend = mem_init(mbinfo, kstart, kend);
     kprintf("Memory manager and Heap initialized\n");
 
     /* re-enable interrupts */
@@ -106,16 +108,16 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     scheduler_init();
     kprintf("Scheduler initialized\n");
 
-    /* if (initrd_info.start || initrd_info.end) { */
-    /*     size_t len = (char*)initrd_info.end - (char*)initrd_info.start; */
-    /*     kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n", */
-    /*             initrd_info.start, len); */
-    /*     block_device_t* initrd = ramdisk_init(initrd_info.start, len); */
-    /*     (void)initrd; */
-    /* } */
+    if (initrd_info.start || initrd_info.end) {
+        size_t len = (char*)initrd_info.end - (char*)initrd_info.start;
+        kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n",
+                initrd_info.start, len);
+        block_device_t* initrd = ramdisk_init(initrd_info.start, len);
+        (void)initrd;
+    }
 
-    /* paging_install(&g_end); */
-    /* kprintf("Paging enabled\n"); */
+    paging_install();
+    kprintf("Paging enabled\n");
 
     char *tmp = "Hello World!\n";
     char *new = malloc(strlen(tmp) + 1);

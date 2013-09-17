@@ -18,7 +18,7 @@ static inline bool is_page_aligned(uintptr_t addr)
     return addr == (addr & PAGE_MASK);
 }
 
-static uintptr_t page_align_up(uintptr_t addr)
+uintptr_t page_align_up(uintptr_t addr)
 {
     /* only align forward a page if not already aligned */
     /* so for 4K pages, least significant 3 bytes are not zero */
@@ -29,7 +29,7 @@ static uintptr_t page_align_up(uintptr_t addr)
     return addr;
 }
 
-static uintptr_t page_align_down(uintptr_t addr)
+uintptr_t page_align_down(uintptr_t addr)
 {
     return addr & PAGE_MASK;
 }
@@ -137,7 +137,7 @@ static void mark_page_range(uintptr_t start, uintptr_t end, uint32_t flags)
 }
 
 
-void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kernend)
+uintptr_t mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kernend)
 {
     /* for now, require valid memory limits in multiboot info */
     KASSERT(mbinfo->flags & MULTIBOOT_INFO_MEMORY);
@@ -203,6 +203,8 @@ void mem_init(struct multiboot_info *mbinfo, uintptr_t kernstart, uintptr_t kern
     /* initialize the kernel's heap */
     DEBUGF("Creating kernel heap: start=0x%x, size=0x%x\n", heap_start, KERNEL_HEAP_SIZE);
     bpool((void*) heap_start, KERNEL_HEAP_SIZE);
+
+    return heap_end;
 }
 
 void* alloc_page(void)
