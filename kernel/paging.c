@@ -45,23 +45,23 @@ void paging_install(void)
     }
 
     /* move PHYSICAL page directory address into cr3 */
-    asm volatile("mov %0, %%cr3":: "b" (virt_to_phys(page_directory)));
+    asm volatile("mov %0, %%cr3":: "r" (virt_to_phys(page_directory)));
 
     /* clear 4MB page bit since we're switching to 4KB pages */
     uint32_t cr4;
-    asm volatile("mov %%cr4, %0": "=b" (cr4));
+    asm volatile("mov %%cr4, %0": "=r" (cr4));
     cr4 &= ~(0x00000010);
-    asm volatile("mov %0, %%cr4":: "b" (cr4));
+    asm volatile("mov %0, %%cr4":: "r" (cr4));
 
     /* read cr0, set paging bit, write it back */
     uint32_t cr0;
-    asm volatile("mov %%cr0, %0": "=b" (cr0));
+    asm volatile("mov %%cr0, %0": "=r" (cr0));
     cr0 |= 0x80000000;
-    asm volatile("mov %0, %%cr0":: "b" (cr0));
+    asm volatile("mov %0, %%cr0":: "r" (cr0));
 
     /*
     uint32_t cr3;
-    asm volatile("mov %%cr3, %0": "=b" (cr3));
+    asm volatile("mov %%cr3, %0": "=r" (cr3));
 
     kprintf("Kernel end: 0x%x\n", end);
     kprintf("page directory phyical: 0x%x\n", cr3);

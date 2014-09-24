@@ -1,4 +1,4 @@
-CCHOME = $(HOME)/opt/cross
+CCHOME ?= $(HOME)/opt/cross
 
 CC = $(CCHOME)/bin/i386-elf-gcc
 NASM = nasm
@@ -13,7 +13,7 @@ KERNDIR = kernel
 OBJDIR = obj
 ISODIR = isodir
 
-INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.8.1/include
+INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.9.1/include
 
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.h) $(wildcard $(KERNDIR)/*.asm)
 KERN_OBJS := $(addprefix $(OBJDIR)/,\
