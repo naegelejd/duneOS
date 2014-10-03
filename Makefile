@@ -27,7 +27,7 @@ ISO = Dune32.iso
 GRUB_CFG = grub.cfg
 
 QEMU = qemu-system-i386
-QARGS = -m 32 -initrd README.md -debugcon stdio
+QARGS = -m 32 -initrd modules/hello.bin -debugcon stdio
 
 .PHONY: all
 all: $(KERNEL)
@@ -45,6 +45,9 @@ $(KERN_OBJS): | $(OBJDIR)
 $(OBJDIR):
 	test -d $(OBJDIR) || mkdir $(OBJDIR)
 
+modules:
+	$(MAKE) -C modules/
+
 $(ISO): $(KERNEL) $(GRUB_CFG)
 	cp $< $(ISODIR)/boot/
 	cp $(GRUB_CFG) $(ISODIR)/boot/grub/
@@ -58,7 +61,7 @@ $(ISODIR):
 iso: $(ISO)
 
 .PHONY: run
-run: $(KERNEL)
+run: $(KERNEL) modules
 	$(QEMU) $(QARGS) -kernel $<
 
 tags: $(KERN_SRCS)

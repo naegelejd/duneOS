@@ -20,7 +20,7 @@ To try DuneOS, obtain `QEMU` (specifically `qemu-system-i386`) then:
 CD-ROM
 ------
 To make a bootable CD-ROM image, you'll need the tools packaged with GRUB, specifically
-`grub-mkrescue` and it's primary dependency `xorriso` (not available on Mac OS X).
+`grub-mkrescue` and its primary dependency `xorriso` (not available on Mac OS X).
 
     make iso
 

@@ -5,6 +5,7 @@
 #include "idt.h"
 #include "irq.h"
 #include "mem.h"
+#include "spkr.h"
 #include "paging.h"
 #include "thread.h"
 #include "tss.h"
@@ -68,6 +69,21 @@ uintptr_t load_mods(struct multiboot_info *mbinfo, struct modinfo *initrd_info)
     return end;
 }
 
+void dumpmem(uintptr_t start, size_t bytes)
+{
+    if (bytes > 256) bytes = 256;
+    DEBUGF("Dump mem: 0x%x (%u bytes)\n", start, bytes);
+    char *ptr = (char*)start;
+    unsigned int i;
+    for (i = 0; i < bytes / 16; i++) {
+        DEBUGF("%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x\n",
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF);
+    }
+}
+
 void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* interrupts are disabled */
@@ -108,13 +124,13 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     scheduler_init();
     kprintf("Scheduler initialized\n");
 
-    if (initrd_info.start || initrd_info.end) {
-        size_t len = (char*)initrd_info.end - (char*)initrd_info.start;
-        kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n",
-                initrd_info.start, len);
-        block_device_t* initrd = ramdisk_init(initrd_info.start, len);
-        (void)initrd;
-    }
+    /* if (initrd_info.start || initrd_info.end) { */
+    /*     size_t len = (char*)initrd_info.end - (char*)initrd_info.start; */
+    /*     kprintf("Initializing RAMDisk @ 0x%x (%u bytes)\n", */
+    /*             initrd_info.start, len); */
+    /*     block_device_t* initrd = ramdisk_init(initrd_info.start, len); */
+    /*     (void)initrd; */
+    /* } */
 
     paging_install();
     kprintf("Paging enabled\n");
@@ -125,6 +141,18 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     new[strlen(tmp)] = '\0';
     kprintf("%s", new);
     free(new);
+
+    kprintf("%u\n", get_esp());
+
+    /* Run GRUB module (which just returns the value of register ESP */
+    unsigned int len = initrd_info.end - initrd_info.start;
+    /* dumpmem(initrd_info.start, len); */
+    typedef uint32_t (*call_module_t)(void);
+    void *cp = malloc(len);
+    memcpy(cp, initrd_info.start, len);
+    call_module_t mod0 = (call_module_t)cp;
+    uint32_t esp = mod0();
+    kprintf("%u\n", esp);
 
     /* start thread to print date/time on screen */
     thread_t* date_printer = start_kernel_thread(
@@ -143,14 +171,12 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* kprintf("page fault? %u\n", *page_fault); */
 
     /* playing around */
-    /*
-    kprintf("%u\n", 1 / 0);
+    /* kprintf("%u\n", 1 / 0); */
 
-    beep(2);
-    delay(5000);
-    kreboot();
-    */
+    /* beep(2); */
+    /* delay(500); */
+    /* kreboot(); */
 
-    kcls();
+    /* kcls(); */
     kprintf("Goodbye!");
 }
