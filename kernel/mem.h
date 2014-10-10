@@ -48,4 +48,6 @@ void free_page(void* page_addr);
 void* malloc(size_t size);
 void free(void *buffer);
 
+void dumpmem(uintptr_t start, size_t bytes);
+
 #endif /* DUNE_MEM_H */

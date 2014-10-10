@@ -7,8 +7,8 @@
 #include "mem.h"
 #include "spkr.h"
 #include "paging.h"
+#include "syscall.h"
 #include "thread.h"
-#include "tss.h"
 #include "kb.h"
 #include "rtc.h"
 #include "timer.h"
@@ -16,6 +16,7 @@
 #include "initrd.h"
 
 extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
+extern void start_user_mode(void);
 
 void print_date(uint32_t arg)
 {
@@ -69,27 +70,26 @@ uintptr_t load_mods(struct multiboot_info *mbinfo, struct modinfo *initrd_info)
     return end;
 }
 
-void dumpmem(uintptr_t start, size_t bytes)
+void test_user_mode(void)
 {
-    if (bytes > 256) bytes = 256;
-    DEBUGF("Dump mem: 0x%x (%u bytes)\n", start, bytes);
-    char *ptr = (char*)start;
-    unsigned int i;
-    for (i = 0; i < bytes / 16; i++) {
-        DEBUGF("%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x\n",
-                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
-                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
-                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
-                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF);
-    }
+    char *dst = malloc(42);
+    strcpy(dst, "hello");
+    *(char *)VIDEO_ADDR = '$';
+    *(char *)(VIDEO_ADDR + 1) = WHITE_ON_BLACK;
+
+    /* asm volatile ("int $0x80"); */
+
+    /* kprintf("In user mode\n"); */
+    while (1) ;
 }
 
-void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
+void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* interrupts are disabled */
 
     kcls();
     kprintf("Welcome to DuneOS...\n\n");
+    kprintf("ESP: 0x%X\n", get_esp());
 
     if (mboot_magic == MULTIBOOT_BOOTLOADER_MAGIC) {
         kprintf("Multiboot Successful\n");
@@ -105,7 +105,6 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("IDT and ISRs installed\n");
     irq_install();
     kprintf("IRQ handlers installed\n");
-    tss_init();
 
     struct modinfo initrd_info;
     uintptr_t modsend = load_mods(mbinfo, &initrd_info);
@@ -117,12 +116,13 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* re-enable interrupts */
     sti();
 
-    timer_install();
-    keyboard_install();
-    rtc_install();
+    /* timer_install(); */
+    /* keyboard_install(); */
+    /* rtc_install(); */
+    syscalls_install();
 
-    scheduler_init();
-    kprintf("Scheduler initialized\n");
+    /* scheduler_init(); */
+    /* kprintf("Scheduler initialized\n"); */
 
     /* if (initrd_info.start || initrd_info.end) { */
     /*     size_t len = (char*)initrd_info.end - (char*)initrd_info.start; */
@@ -142,17 +142,31 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("%s", new);
     free(new);
 
-    kprintf("%u\n", get_esp());
+    kprintf("ESP: 0x%X\n", get_esp());
 
     /* Run GRUB module (which just returns the value of register ESP */
-    unsigned int len = initrd_info.end - initrd_info.start;
+    /* unsigned int len = initrd_info.end - initrd_info.start; */
     /* dumpmem(initrd_info.start, len); */
-    typedef uint32_t (*call_module_t)(void);
-    void *cp = malloc(len);
-    memcpy(cp, initrd_info.start, len);
-    call_module_t mod0 = (call_module_t)cp;
-    uint32_t esp = mod0();
-    kprintf("%u\n", esp);
+    /* typedef uint32_t (*call_module_t)(void); */
+    /* void *cp = malloc(len); */
+    /* memcpy(cp, initrd_info.start, len); */
+    /* call_module_t mod0 = (call_module_t)cp; */
+    /* uint32_t esp = mod0(); */
+    /* kprintf("ESP: 0x%X\n", esp); */
+
+    /* Test interrupt handler(s) */
+    /* asm volatile ("int $0x03"); */
+
+    void* stack = alloc_page();
+    kprintf("Allocated new kernel stack: 0x%X\n", stack);
+    set_kernel_stack((uintptr_t)stack + PAGE_SIZE);
+    start_user_mode();
+    test_user_mode();
+
+    /* Test ISR handler with a page fault */
+    /* uintptr_t* page_fault = (uintptr_t*)0xFFFFF0000; */
+    /* kprintf("page fault? 0x%x\n", *page_fault); */
+    /* kprintf("page fault? %u\n", *page_fault); */
 
     /* start thread to print date/time on screen */
     thread_t* date_printer = start_kernel_thread(
@@ -165,10 +179,6 @@ void main(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* wait for child threads to finish (forever) */
     join(echoer);
     join(date_printer);
-
-    /* uint32_t* page_fault = 0xFFFFF0000; */
-    /* kprintf("page fault? 0x%x\n", *page_fault); */
-    /* kprintf("page fault? %u\n", *page_fault); */
 
     /* playing around */
     /* kprintf("%u\n", 1 / 0); */

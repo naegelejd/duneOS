@@ -272,3 +272,18 @@ void free(void *buffer)
     brel(buffer);
     end_int_atomic(iflag);
 }
+
+void dumpmem(uintptr_t start, size_t bytes)
+{
+    if (bytes > 256) bytes = 256;
+    DEBUGF("Dump mem: 0x%x (%u bytes)\n", start, bytes);
+    char *ptr = (char*)start;
+    unsigned int i;
+    for (i = 0; i < bytes / 16; i++) {
+        DEBUGF("%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x\n",
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF,
+                *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF, *ptr++ & 0xFF);
+    }
+}

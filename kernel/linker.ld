@@ -1,5 +1,5 @@
 OUTPUT_FORMAT(elf32-i386)
-ENTRY(_load)
+ENTRY(load)
 
 phys = 0x100000;
 offset = 0xC0000000;

@@ -2,8 +2,10 @@
 bits 32
 
 ; Definitions
-KERNEL_CS equ 1 << 3
-KERNEL_DS equ 2 << 3
+KERNEL_CS equ 0x08
+KERNEL_DS equ 0x10
+USERMODE_CS equ 0x18
+USERMODE_DS equ 0x20
 
 STACK_SIZE          equ 0x1000 ; 4KB stack
 THREAD_CONTEXT_SIZE equ 0x1000 ; 4KB just for thread struct
@@ -43,11 +45,11 @@ multiboot:
     dd MBOOT_HDR_FLAGS
     dd MBOOT_CHECKSUM
     ; Mem info (only valid if aout kludge flag set or ELF kernel)
-    dd 0x00000000   ; header address
-    dd 0x00000000   ; load address
-    dd 0x00000000   ; load end address
-    dd 0x00000000   ; bss end address
-    dd 0x00000000   ; entry address
+    ;dd 0x00000000   ; header address
+    ;dd 0x00000000   ; load address
+    ;dd 0x00000000   ; load end address
+    ;dd 0x00000000   ; bss end address
+    ;dd 0x00000000   ; entry address
     ; Graphics requests (only valid if graphics flag set)
     ;dd 0x00000000   ; linear graphics
     ;dd 0            ; width
@@ -55,11 +57,11 @@ multiboot:
     ;dd 32           ; set to 32
 
 
-[global _load]
-_load equ (g_start - KERNEL_VIRTUAL_BASE)
+global load
+load equ (g_start - KERNEL_VIRTUAL_BASE)
 
-[extern main]
-[global g_start]
+extern kmain
+global g_start
 g_start:
     mov ecx, (boot_page_directory - KERNEL_VIRTUAL_BASE)
     mov cr3, ecx    ; Load page directory
@@ -84,10 +86,10 @@ start_higher_half:
 
     mov esp, kernel_stack_top ; set up stack pointer
     push eax    ; push header magic
-    add ebx, KERNEL_VIRTUAL_BASE
+    add ebx, KERNEL_VIRTUAL_BASE    ; make multiboot header pointer virtual
     push ebx    ; push header pointer (TODO: hopefully this isn't at an addr > 4MB)
     cli         ; disable interrupts
-    call main
+    call kmain
 
     cli
 .hang:
@@ -108,6 +110,14 @@ gdt_flush:
     mov ss, ax
     jmp KERNEL_CS:.flush ; offset into GDT for kernel code segment (far jump)
 .flush:
+    ret
+
+; TODO: use definitions for TSS_SELECTOR and USERMODE_DPL
+global tss_flush
+tss_flush:
+    mov ax, 0x28    ; load TSS_SELECTOR into ax
+    or ax, 0x3      ; set USERMODE_DPL on selector ???
+    ltr ax          ; load TSS
     ret
 
 ; Load the 6-byte IDT pointer from the address passed as parameter
@@ -190,7 +200,7 @@ isr_no_err 18   ; Machine Check Exception
 ; Interrupts 19-31 are Intel Reserved and have no error code
 ; Interrupts 32-255 have no error code
 %assign intno 19
-%rep (256 - 19)
+%rep (256 - 19)     ; TODO: use IDT_NUM_ENTRIES definition
 isr_no_err intno
 %assign intno intno + 1
 %endrep
@@ -207,11 +217,11 @@ isr_common_stub:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mov eax, esp    ; Push the stack
+    mov eax, esp    ; Push pointer to the stack (struct regs *)
     push eax
     mov eax, default_int_handler
     call eax        ; A special call, preserves the 'eip' register
-    pop eax
+    pop eax         ; Pop pointer to stack (struct regs *)
     popregs
     add esp, 8      ; Cleans up pushed error code and pushed ISR number
     iret            ; Pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
@@ -265,13 +275,6 @@ irq_common_stub:
     iret            ; pop CS, EIP, EFLAGS, SS, and ESP
 
 
-; return contents of EFLAGS register
-[global get_eflags]
-get_eflags:
-    pushfd      ; push eflags
-    pop eax     ; pop contents into eax
-    ret
-
 ; switch to a new thread
 ; when switch_to_thread is called, the stack looks like:
 ;       - pointer to thread
@@ -314,6 +317,31 @@ switch_to_thread:
     add esp, 8      ; skip over fake error code, fake INT number
 
     iret
+
+global start_user_mode
+start_user_mode:
+    cli
+    mov ax, USERMODE_DS | 0x03  ; ring-3
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    mov eax, esp
+    push USERMODE_DS | 0x03     ; ring-3
+    push eax
+
+    pushf
+    ; Set IF flag in EFLAGS to automatically re-enable interrupts
+    ;pop eax
+    ;or eax, 0x200
+    ;push eax
+
+    push USERMODE_CS | 0x03     ; ring-3
+    push user_mode_next
+    iret
+user_mode_next:
+    ret
 
 
 section .bss

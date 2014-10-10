@@ -25,7 +25,8 @@
     THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include "seg.h"
+#include "x86.h"
+#include "gdt.h"
 #include "mem.h"
 #include "int.h"
 #include "timer.h"
@@ -652,6 +653,8 @@ void schedule(void)
 
     KASSERT(runnable);
     KASSERT(g_current_thread);
+
+    set_kernel_stack(g_current_thread->esp);
 
     switch_to_thread(runnable);
 }

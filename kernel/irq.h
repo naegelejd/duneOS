@@ -3,10 +3,6 @@
 
 #include "int.h"
 
-
-enum { NUM_IRQ_HANDLERS = 16 };
-enum { IRQ_ISR_START = 32 };
-
 enum {
     IRQ_TIMER = 0,
     IRQ_KEYBOARD = 1,

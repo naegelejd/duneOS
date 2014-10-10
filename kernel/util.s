@@ -3,12 +3,20 @@
 section .text
 align 4
 
+; return stack pointer
 global get_esp
 get_esp:
     sub     esp, 16
     mov     dword [esp+12], esp
     mov     eax, dword [esp+12]
     add     esp, 16
+    ret
+
+; return contents of EFLAGS register
+global get_eflags
+get_eflags:
+    pushfd      ; push eflags
+    pop eax     ; pop contents into eax
     ret
 
 global khalt

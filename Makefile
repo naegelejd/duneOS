@@ -1,24 +1,27 @@
 CCHOME ?= $(HOME)/opt/cross
 
 CC = $(CCHOME)/bin/i386-elf-gcc
+#NASM = nasm -g
 NASM = nasm
 
-DEFINES = -DDUNE -DQEMU_DEBUG -g
-CFLAGS = $(DEFINES) --std=gnu99 -Wall -Wextra -pedantic -nostdlib -nostdinc \
+#DEFINES = -DDUNE -DQEMU_DEBUG -g
+DEFINES = -DDUNE -DQEMU_DEBUG
+CFLAGS = $(DEFINES) --std=gnu99 -Wall -Wextra -pedantic -nostdlib \
 	-ffreestanding -finline-functions
 NFLAGS = -felf
-LFLAGS = #-lgcc
+LFLAGS = -lgcc
 
 KERNDIR = kernel
 OBJDIR = obj
 ISODIR = isodir
 
-INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.9.1/include
+# INCLUDES = -I$(KERNDIR)/ -I$(CCHOME)/lib/gcc/i386-elf/4.9.1/include
+INCLUDES = -I$(KERNDIR)/
 
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.h) $(wildcard $(KERNDIR)/*.asm)
 KERN_OBJS := $(addprefix $(OBJDIR)/,\
-	start.o main.o io.o gdt.o tss.o idt.o irq.o int.o bget.o mem.o \
-	paging.o thread.o blkdev.o initrd.o \
+	start.o main.o io.o gdt.o idt.o irq.o int.o bget.o mem.o \
+	paging.o syscall.o thread.o blkdev.o initrd.o \
 	timer.o kb.o spkr.o rtc.o screen.o string.o print.o util.o \
 	elf.o ext2.o fat.o)
 
@@ -28,6 +31,7 @@ GRUB_CFG = grub.cfg
 
 QEMU = qemu-system-i386
 QARGS = -m 32 -initrd modules/hello.bin -debugcon stdio
+# QARGS = -s -S -m 32 -initrd modules/hello.bin -debugcon stdio # -d int,cpu_reset
 
 .PHONY: all
 all: $(KERNEL)

@@ -129,7 +129,7 @@ static size_t kvasprintf(char **dest, cput_t put, char *fmt, va_list arg)
                     count = 2;
                     break;
 
-                case 'x': 
+                case 'x':
                 case 'X':
                     count = uint2str(num_buf, va_arg(arg, unsigned int),
                             16, (c == 'X'));
@@ -156,7 +156,7 @@ static size_t kvasprintf(char **dest, cput_t put, char *fmt, va_list arg)
                     count = strlen(str_buf);
                     break;
                 }
-                
+
                 case 'c':
                     num_buf[0] = c;
                     num_buf[1] = 0;

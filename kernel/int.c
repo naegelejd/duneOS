@@ -1,3 +1,4 @@
+#include "assert.h"
 #include "int.h"
 
 extern uint32_t get_eflags(void);

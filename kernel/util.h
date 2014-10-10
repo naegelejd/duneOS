@@ -3,8 +3,9 @@
 
 #include "dune.h"
 
+uint32_t get_esp();
+uint32_t get_eflags();
 void kreboot();
 void khalt();
-uint32_t get_esp();
 
 #endif /* DUNE_UTIL_H */

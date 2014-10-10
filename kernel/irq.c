@@ -1,6 +1,12 @@
+#include "assert.h"
 #include "io.h"
 #include "idt.h"
+#include "x86.h"
 #include "irq.h"
+
+
+enum { IRQ_NUM_HANDLERS = 16 };
+enum { IRQ_ISR_START = 32 };
 
 /* These special IRQs point to the special IRQ handler
  * rather than the default 'fault_handler'
@@ -33,7 +39,7 @@ enum {
 extern void irq0(), irq1(), irq2(), irq3(), irq4(), irq5(), irq6(), irq7();
 extern void irq8(), irq9(), irq10(), irq11(), irq12(), irq13(), irq14(), irq15();
 
-static int_handler_t g_isrs[NUM_IRQ_HANDLERS];
+static int_handler_t g_isrs[IRQ_NUM_HANDLERS];
 
 /* static copy of the IRQ mask from MASTER/SLAVE PIC data ports */
 static uint16_t g_irq_mask;
@@ -55,7 +61,7 @@ static void update_irq_mask(uint16_t mask) {
 void enable_irq(unsigned int irq)
 {
     bool iflag = beg_int_atomic();
-    KASSERT(irq <= NUM_IRQ_HANDLERS);
+    KASSERT(irq <= IRQ_NUM_HANDLERS);
     uint16_t mask = g_irq_mask;
     mask &= ~(1 << irq);
     update_irq_mask(mask);
@@ -65,7 +71,7 @@ void enable_irq(unsigned int irq)
 void disable_irq(unsigned int irq)
 {
     bool iflag = beg_int_atomic();
-    KASSERT(irq <= NUM_IRQ_HANDLERS);
+    KASSERT(irq <= IRQ_NUM_HANDLERS);
     uint16_t mask = g_irq_mask;
     mask |= 1 << irq;
     update_irq_mask(mask);
@@ -78,7 +84,7 @@ void disable_irq(unsigned int irq)
  * The PIC(s) (8259) can be programmed to remap IRQ 0-15
  * to IDT entries 32-47
  */
-void irq_remap(void)
+static void irq_remap(void)
 {
     outportb(MASTER_PIC_CMD, 0x11); /* write ICW1 to PICM, we are gonna write commands to PICM */
     outportb(SLAVE_PIC_CMD, 0x11); /* write ICW1 to PICS, we are gonna write commands to PICS */
@@ -106,27 +112,27 @@ void irq_install(void)
     g_irq_mask = 0xFFFB;
     irq_remap();
 
-    idt_set_int_gate(IRQ_ISR_START, (uintptr_t)irq0, 0);
-    idt_set_int_gate(IRQ_ISR_START + 1, (uintptr_t)irq1, 0);
-    idt_set_int_gate(IRQ_ISR_START + 2, (uintptr_t)irq2, 0);
-    idt_set_int_gate(IRQ_ISR_START + 3, (uintptr_t)irq3, 0);
-    idt_set_int_gate(IRQ_ISR_START + 4, (uintptr_t)irq4, 0);
-    idt_set_int_gate(IRQ_ISR_START + 5, (uintptr_t)irq5, 0);
-    idt_set_int_gate(IRQ_ISR_START + 6, (uintptr_t)irq6, 0);
-    idt_set_int_gate(IRQ_ISR_START + 7, (uintptr_t)irq7, 0);
-    idt_set_int_gate(IRQ_ISR_START + 8, (uintptr_t)irq8, 0);
-    idt_set_int_gate(IRQ_ISR_START + 9, (uintptr_t)irq9, 0);
-    idt_set_int_gate(IRQ_ISR_START + 10, (uintptr_t)irq10, 0);
-    idt_set_int_gate(IRQ_ISR_START + 11, (uintptr_t)irq11, 0);
-    idt_set_int_gate(IRQ_ISR_START + 12, (uintptr_t)irq12, 0);
-    idt_set_int_gate(IRQ_ISR_START + 13, (uintptr_t)irq13, 0);
-    idt_set_int_gate(IRQ_ISR_START + 14, (uintptr_t)irq14, 0);
-    idt_set_int_gate(IRQ_ISR_START + 15, (uintptr_t)irq15, 0);
+    idt_set_int_gate(IRQ_ISR_START, (uintptr_t)irq0, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 1, (uintptr_t)irq1, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 2, (uintptr_t)irq2, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 3, (uintptr_t)irq3, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 4, (uintptr_t)irq4, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 5, (uintptr_t)irq5, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 6, (uintptr_t)irq6, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 7, (uintptr_t)irq7, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 8, (uintptr_t)irq8, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 9, (uintptr_t)irq9, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 10, (uintptr_t)irq10, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 11, (uintptr_t)irq11, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 12, (uintptr_t)irq12, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 13, (uintptr_t)irq13, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 14, (uintptr_t)irq14, KERNEL_DPL);
+    idt_set_int_gate(IRQ_ISR_START + 15, (uintptr_t)irq15, KERNEL_DPL);
 }
 
 void irq_install_handler(unsigned int irq, int_handler_t handler)
 {
-    KASSERT(irq < NUM_IRQ_HANDLERS);
+    KASSERT(irq < IRQ_NUM_HANDLERS);
     g_isrs[irq] = handler;
 }
 
@@ -140,7 +146,7 @@ void default_irq_handler(struct regs *r)
     int_handler_t handler = NULL;
 
     int irq = r->int_no - IRQ_ISR_START;
-    KASSERT((irq < NUM_IRQ_HANDLERS) && (irq >= 0));
+    KASSERT((irq < IRQ_NUM_HANDLERS) && (irq >= 0));
 
     /* run IRQ-specific handler if installed */
     handler = g_isrs[irq];
