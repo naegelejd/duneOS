@@ -1,0 +1,10 @@
+#romimage: file=$BXSHARE/BIOS-bochs-latest, address=0xf0000
+romimage: file=$BXSHARE/BIOS-bochs-latest
+vgaromimage: file=$BXSHARE/VGABIOS-elpin-2.40
+ata0-master: type=cdrom, path=Dune32.iso, status=inserted
+boot: cdrom, floppy, disk
+mouse: enabled=0
+clock: sync=realtime
+#cpu: ips=500000
+megs: 32
+log: bochs.out

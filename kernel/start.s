@@ -57,9 +57,6 @@ multiboot:
     ;dd 32           ; set to 32
 
 
-global load
-load equ (g_start - KERNEL_VIRTUAL_BASE)
-
 extern kmain
 global g_start
 g_start:
