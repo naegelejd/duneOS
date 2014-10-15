@@ -216,7 +216,7 @@ static void init_tss_seg_descr(struct seg_descr* descr, struct tss* tss)
 static void init_tss(struct tss* tss)
 {
     memset(tss, 0, sizeof(*tss));
-    tss->ss0 = CODE_SEG_SELECTOR;
+    tss->ss0 = DATA_SEG_SELECTOR;
     tss->esp0 = 0;
     tss->cs = CODE_SEG_SELECTOR | USERMODE_DPL;
     tss->ss = DATA_SEG_SELECTOR | USERMODE_DPL;

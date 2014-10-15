@@ -77,9 +77,7 @@ void test_user_mode(void)
     *(char *)VIDEO_ADDR = '$';
     *(char *)(VIDEO_ADDR + 1) = WHITE_ON_BLACK;
 
-    /* asm volatile ("int $0x80"); */
-
-    /* kprintf("In user mode\n"); */
+    syscall_print("Hello from usermode!");
     while (1) ;
 }
 
@@ -116,9 +114,9 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* re-enable interrupts */
     sti();
 
-    /* timer_install(); */
-    /* keyboard_install(); */
-    /* rtc_install(); */
+    timer_install();
+    keyboard_install();
+    rtc_install();
     syscalls_install();
 
     /* scheduler_init(); */
