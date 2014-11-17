@@ -62,6 +62,8 @@ typedef struct thread_queue thread_queue_t;
 struct thread {
     uint32_t esp;
     volatile uint32_t num_ticks;
+    uint32_t kernel_esp;
+
     priority_t priority;
 
     void* stack_page;

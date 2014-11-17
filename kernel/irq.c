@@ -33,7 +33,8 @@ enum {
     MASTER_PIC_CMD = 0x20,
     MASTER_PIC_DATA = 0x21,
     SLAVE_PIC_CMD = 0xA0,
-    SLAVE_PIC_DATA = 0xA1
+    SLAVE_PIC_DATA = 0xA1,
+    PIC_EOI = 0x20
 };
 
 extern void irq0(), irq1(), irq2(), irq3(), irq4(), irq5(), irq6(), irq7();
@@ -78,6 +79,15 @@ void disable_irq(unsigned int irq)
     end_int_atomic(iflag);
 }
 
+bool irq_enabled(unsigned int irq)
+{
+    bool iflag = beg_int_atomic();
+    KASSERT(irq <= IRQ_NUM_HANDLERS);
+    uint16_t mask = g_irq_mask;
+    bool enabled = (mask & (1 << irq)) == 0;
+    end_int_atomic(iflag);
+    return enabled;
+}
 
 /* Normally, IRQ 0-8 are mapped to IDT entries 8-15.
  * These conflict with the IDT entries already installed.
@@ -158,9 +168,9 @@ void default_irq_handler(struct regs *r)
      * (meaning IRQ8-15), then send 'End of Interrupt' to
      * slave interrupt controller */
     if (irq > 7) {
-        outportb(SLAVE_PIC_CMD, MASTER_PIC_CMD);
+        outportb(SLAVE_PIC_CMD, PIC_EOI);
     }
 
-    /* regardless, send and EOI to master interrupt controller */
-    outportb(MASTER_PIC_CMD, MASTER_PIC_CMD);
+    /* regardless, send an EOI to master interrupt controller */
+    outportb(MASTER_PIC_CMD, PIC_EOI);
 }

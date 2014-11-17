@@ -95,7 +95,7 @@ start_higher_half:
 
 ; Load the 6-byte GDT pointer from the address passed as a parameter
 ; this will set up segment registers then far jump
-[global gdt_flush]  ; make linkable
+global gdt_flush    ; make linkable
 gdt_flush:
     mov eax, [esp+4]
     lgdt [eax]      ; load our GDT pointer from 'gdt.c'
@@ -118,7 +118,7 @@ tss_flush:
     ret
 
 ; Load the 6-byte IDT pointer from the address passed as parameter
-[global idt_flush]
+global idt_flush
 idt_flush:
     mov eax, [esp+4]
     lidt [eax]
@@ -157,7 +157,7 @@ idt_flush:
 %endmacro
 
 %macro isr_no_err 1
-[global isr%1]
+global isr%1
 isr%1:
     push dword 0
     push dword %1
@@ -165,7 +165,7 @@ isr%1:
 %endmacro
 
 %macro isr_err_code 1
-[global isr%1]
+global isr%1
 isr%1:
     nop
     nop
@@ -203,7 +203,7 @@ isr_no_err intno
 %endrep
 
 
-[extern default_int_handler]
+extern default_int_handler
 ; Common ISR stub
 ; Save processor state, set up for kernel mode segments,
 ; call C-level fault handler, restore processor state
@@ -221,14 +221,14 @@ isr_common_stub:
     pop eax         ; Pop pointer to stack (struct regs *)
     popregs
     add esp, 8      ; Cleans up pushed error code and pushed ISR number
-    iret            ; Pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
+    iret            ; pop EIP, CS, EFLAGS, SS, and ESP; jump to EIP
 
 
 ; Macro for all IRQ handling code
 ; Push ISR number, which is 32 + IDT number because
 ; we remap IRQ 0-15 to IDT 32-47
 %macro irq_handle 1
-[global irq%1]
+global irq%1
 irq%1:
     push byte 0
     push byte 32+%1
@@ -253,7 +253,10 @@ irq_handle 14    ; IRQ 14 (IDT 46)
 irq_handle 15    ; IRQ 14 (IDT 47)
 
 
-[extern default_irq_handler]
+extern default_irq_handler
+extern g_need_reschedule
+extern wake_sleepers
+extern get_next_runnable
 ; calls default_irq_handler defined in 'irq.c'
 irq_common_stub:
     pushregs
@@ -267,9 +270,26 @@ irq_common_stub:
     mov eax, default_irq_handler
     call eax        ; preserves EIP ?
     pop eax
+
+    cmp [g_need_reschedule], dword 0
+    je .restore
+
+    call wake_sleepers
+
+    mov eax, [g_current_thread]
+    mov [eax+0], esp            ; set thread's stack pointer
+    mov [eax+4], dword 0        ; clear num_ticks field
+
+    call get_next_runnable
+    mov [g_current_thread], eax
+    mov esp, [eax+0]
+
+    mov [g_need_reschedule], dword 0
+
+.restore:
     popregs
     add esp, 8      ; clean up pushed error code and ISR number
-    iret            ; pop CS, EIP, EFLAGS, SS, and ESP
+    iret            ; pop EIP, CS, EFLAGS, SS, and ESP; jump to EIP
 
 
 ; switch to a new thread
@@ -282,9 +302,11 @@ irq_common_stub:
 ;       - CS
 ;       - func return address
 ; so it looks like an interrupt occurred
-[extern g_current_thread]
-[global switch_to_thread]
+extern g_current_thread
+extern set_kernel_stack
+global switch_to_thread
 switch_to_thread:
+    ;xchg bx, bx         ; BOCHS magic breakpoint
     push eax            ; save eax
     mov eax, [esp+4]    ; put return address in eax
     mov [esp-4], eax    ; move return address down 8 bytes
@@ -310,6 +332,10 @@ switch_to_thread:
     mov [g_current_thread], eax ; update new current thread
     mov esp, [eax+0]            ; update ESP
 
+    ;push dword [eax+8]
+    ;call set_kernel_stack
+    ;pop eax
+
     popregs
     add esp, 8      ; skip over fake error code, fake INT number
 
@@ -330,9 +356,9 @@ start_user_mode:
 
     pushf
     ; Set IF flag in EFLAGS to automatically re-enable interrupts
-    ;pop eax
-    ;or eax, 0x200
-    ;push eax
+    pop eax
+    or eax, 0x200
+    push eax
 
     push USERMODE_CS | 0x03     ; ring-3
     push user_mode_next
@@ -340,11 +366,16 @@ start_user_mode:
 user_mode_next:
     ret
 
+global get_ring
+get_ring:
+    mov eax, cs
+    and eax, 0x03
+    ret
 
 section .bss
-[global kernel_stack_bottom]
-[global kernel_stack_top]
-[global main_thread_addr]
+global kernel_stack_bottom
+global kernel_stack_top
+global main_thread_addr
 main_thread_addr:
     resb THREAD_CONTEXT_SIZE    ; reserve 4KB for main kernel thread struct
 kernel_stack_bottom:

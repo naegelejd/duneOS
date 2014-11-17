@@ -196,7 +196,7 @@ static inline void push_dword(thread_t* thread, uint32_t value)
  * Initialize members of a kernel thread
  */
 static void init_thread(thread_t* thread, void* stack_page,
-        priority_t priority, bool detached)
+        void* kernel_stack_page, priority_t priority, bool detached)
 {
     static unsigned int next_free_id = 0;
 
@@ -206,6 +206,9 @@ static void init_thread(thread_t* thread, void* stack_page,
     thread->stack_page = stack_page;
     /* TODO: don't assume thread stack is PAGE_SIZE bytes */
     thread->esp = (uintptr_t)stack_page + PAGE_SIZE;
+
+    thread->kernel_esp = (uintptr_t)kernel_stack_page + PAGE_SIZE;
+
     thread->priority = priority;
     thread->owner = owner;
 
@@ -224,17 +227,14 @@ static void init_thread(thread_t* thread, void* stack_page,
  */
 static thread_t* create_thread(unsigned int priority, bool detached)
 {
-    thread_t* thread = NULL;
-    void* stack_page = NULL;
-
-    thread = alloc_page();
+    thread_t *thread = alloc_page();
     DEBUGF("Allocated page @ 0x%x for thread context\n", thread);
     if (!thread) {
         kprintf("Failed to allocate page for thread\n");
         return NULL;
     }
 
-    stack_page = alloc_page();
+    void *stack_page = alloc_page();
     DEBUGF("Allocated page @ 0x%x for thread stack\n", stack_page);
     if (!stack_page) {
         kprintf("Failed to allocate page for thread stack\n");
@@ -242,7 +242,16 @@ static thread_t* create_thread(unsigned int priority, bool detached)
         return NULL;
     }
 
-    init_thread(thread, stack_page, priority, detached);
+    void* kernel_stack_page = alloc_page();
+    DEBUGF("Allocated page @ 0x%x for thread kernel stack\n", kernel_stack_page);
+    if (!stack_page) {
+        kprintf("Failed to allocate page for thread kernel stack\n");
+        free_page(thread);
+        return NULL;
+    }
+
+
+    init_thread(thread, stack_page, kernel_stack_page, priority, detached);
 
     all_threads_add(thread);
 
@@ -298,6 +307,8 @@ static void detach_thread(thread_t* thread)
  */
 static void launch_thread(void)
 {
+    /* DEBUGF("Launching thread %d\n", g_current_thread->id); */
+    /* DEBUGF("%s\n", interrupts_enabled() ? "interrupts enabled\n" : "interrupts disabled\n"); */
     sti();
 }
 
@@ -307,6 +318,7 @@ static void launch_thread(void)
  */
 static void shutdown_thread(void)
 {
+    /* DEBUGF("Shutting down thread %d\n", g_current_thread->id); */
     exit(0);
 }
 
@@ -342,18 +354,18 @@ static void setup_kernel_thread(thread_t* thread,
 
     /* push general registers */
     push_dword(thread, 0);    /* eax */
-    push_dword(thread, 0);    /* ebx */
     push_dword(thread, 0);    /* ecx */
     push_dword(thread, 0);    /* edx */
+    push_dword(thread, 0);    /* ebx */
+    push_dword(thread, 0);    /* ebp */
     push_dword(thread, 0);    /* esi */
     push_dword(thread, 0);    /* edi */
-    push_dword(thread, 0);    /* ebp */
 
     /* push values for saved segment registers.
      * only the DS and ES registers contain valid selectors
      * (FS and GS not used by GCC) */
     push_dword(thread, DATA_SEG_SELECTOR);
-    push_dword(thread, CODE_SEG_SELECTOR);
+    push_dword(thread, DATA_SEG_SELECTOR);
     push_dword(thread, 0);
     push_dword(thread, 0);
 }
@@ -371,6 +383,7 @@ static void reaper(uint32_t arg)
 {
     thread_t* thread;
     (void)arg; /* prevent compiler warnings */
+    DEBUG("Reaper thread reaping\n");
     cli();
 
     while (true) {
@@ -403,7 +416,7 @@ static void reaper(uint32_t arg)
 /*
  * Wake up any threads that are finished sleeping
  */
-static void wake_sleepers(void)
+void wake_sleepers(void)
 {
     thread_t* next = NULL;
     thread_t* thread = sleep_queue.head;
@@ -433,7 +446,7 @@ static thread_t* find_best(thread_queue_t* queue)
     return queue->head;
 }
 
-static thread_t* get_next_runnable(void)
+thread_t* get_next_runnable(void)
 {
     thread_t* best = find_best(&run_queue);
     KASSERT(best);
@@ -654,8 +667,7 @@ void schedule(void)
     KASSERT(runnable);
     KASSERT(g_current_thread);
 
-    set_kernel_stack(g_current_thread->esp);
-
+    /* DEBUGF("switching from thread %d to thread %d\n", g_current_thread->id, runnable->id); */
     switch_to_thread(runnable);
 }
 
@@ -677,6 +689,7 @@ thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
 
         make_runnable_atomic(thread);
     }
+
     return thread;
 }
 
@@ -688,11 +701,12 @@ thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
  */
 void scheduler_init(void)
 {
-    extern char main_thread_addr, kernel_stack_bottom;
+    extern uintptr_t main_thread_addr, kernel_stack_bottom;
     thread_t* main_thread = (thread_t*)&main_thread_addr;
     KASSERT(main_thread);
 
-    init_thread(main_thread, (void*)&kernel_stack_bottom, PRIORITY_NORMAL, true);
+    init_thread(main_thread, (void*)&kernel_stack_bottom,
+            (void*)&kernel_stack_bottom, PRIORITY_NORMAL, true);
     g_current_thread = main_thread;
     all_threads_add(g_current_thread);
 
@@ -706,6 +720,7 @@ void dump_thread_info(thread_t* th)
 {
     KASSERT(th);
     DEBUGF("esp: 0x%X\n", th->esp);
+    DEBUGF("kernel esp: 0x%X\n", th->kernel_esp);
     DEBUGF("num_ticks: %u\n", th->num_ticks);
     DEBUGF("stack_page: 0x%0X\n", th->stack_page);
     DEBUGF("sleep_until: %u\n", th->sleep_until);

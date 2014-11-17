@@ -32,6 +32,8 @@ Fix
 
 - Calibrate the PIT before using it.
 
+- Fix date/time issue present on Bochs (but not QEMU)
+
 - Assess the impact of drift when using the PIT (at 100Hz)
 
 - Verify that I'm delaying long enough when reading/writing
