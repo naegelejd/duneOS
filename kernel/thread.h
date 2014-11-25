@@ -62,12 +62,13 @@ typedef struct thread_queue thread_queue_t;
 struct thread {
     uint32_t esp;
     volatile uint32_t num_ticks;
-    uint32_t kernel_esp;
+    uint32_t user_esp;
+    uint32_t stack_top;
 
     priority_t priority;
 
-    void* stack_page;
-    struct user_context* ucontext;
+    void* stack_base;
+    void* user_stack_base;
     struct thread* owner;
     int refcount;
 
@@ -105,7 +106,7 @@ typedef struct mutex mutex_t;
 
 
 int join(thread_t* thread);
-void sleep(unsigned int ticks);
+void sleep(unsigned int milliseconds);
 void yield(void);
 //void exit(int exit_code) __attribute__ ((noreturn));
 void exit(int exit_code);
@@ -114,8 +115,8 @@ void wait(thread_queue_t* wait_queue);
 void make_runnable(thread_t* thread);
 void make_runnable_atomic(thread_t* thread);
 
-thread_t* start_kernel_thread(thread_start_func_t start_function,
-        uint32_t arg, priority_t priority, bool detached);
+thread_t* spawn_thread(thread_start_func_t start_function,
+        uint32_t arg, priority_t priority, bool detached, bool usermode);
 
 void schedule(void);
 void scheduler_init();

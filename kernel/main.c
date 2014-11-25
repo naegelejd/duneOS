@@ -20,6 +20,7 @@ extern uintptr_t g_start, g_code, g_data, g_bss, g_end;
 static void print_date(uint32_t arg);
 static void echo_input(uint32_t arg);
 static void hog_cpu(uint32_t arg);
+static void usermode_test(uint32_t arg);
 
 struct modinfo {
     uintptr_t start;
@@ -46,42 +47,12 @@ uintptr_t load_mods(struct multiboot_info *mbinfo, struct modinfo *initrd_info)
     return end;
 }
 
-void usermode_init(uint32_t arg)
-{
-    (void)arg;
-    extern void start_user_mode(void);
-    start_user_mode();
-
-    char *dst = (char*)syscall_malloc(42);
-    strcpy(dst, "hello");
-    syscall_print("strcpy successful!");
-
-    *(char *)VIDEO_ADDR = '$';
-    *(char *)(VIDEO_ADDR + 1) = WHITE_ON_BLACK;
-
-    extern int get_ring(void);
-    /* DEBUGF("Making syscall in ring %d\n", get_ring()); */
-    syscall_print("Hello from usermode!");
-
-    /* DEBUGF("Making syscall in ring %d\n", get_ring()); */
-    syscall_print("Still in usermode!");
-
-    /* if (!interrupts_enabled()) { */
-    /*     syscall_print("Interrupts disabled!"); */
-    /* } else { */
-    /*     syscall_print("Interrupts enabled!"); */
-    /* } */
-
-    while (1) ;
-}
-
 void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 {
     /* interrupts are disabled */
 
     kcls();
     kprintf("Welcome to DuneOS...\n\n");
-    kprintf("ESP: 0x%X\n", get_esp());
 
     if (mboot_magic == MULTIBOOT_BOOTLOADER_MAGIC) {
         kprintf("Multiboot Successful\n");
@@ -134,7 +105,7 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     kprintf("%s", new);
     free(new);
 
-    kprintf("ESP: 0x%X\n", get_esp());
+    DEBUGF("ESP: %X\n", get_esp());
 
     /* Run GRUB module (which just returns the value of register ESP */
     /* unsigned int len = initrd_info.end - initrd_info.start; */
@@ -149,36 +120,30 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     /* Test interrupt handler(s) */
     /* asm volatile ("int $0x03"); */
 
-    void* stack = alloc_page();
-    kprintf("Allocated new kernel stack: 0x%X\n", stack);
-    set_kernel_stack((uintptr_t)stack + PAGE_SIZE);
     /* Test ISR handler with a page fault */
     /* uintptr_t* page_fault = (uintptr_t*)0xFFFFF0000; */
     /* kprintf("page fault? 0x%x\n", *page_fault); */
     /* kprintf("page fault? %u\n", *page_fault); */
 
-    thread_t *infinite0 = start_kernel_thread(
-            hog_cpu, 0, PRIORITY_NORMAL, false);
-    thread_t *infinite1 = start_kernel_thread(
-            hog_cpu, 0, PRIORITY_NORMAL, false);
+    /* test threads - loop infinitely without yielding CPU */
+    thread_t *infinite0 = spawn_thread(
+            hog_cpu, 0, PRIORITY_NORMAL, false, false);
+    thread_t *infinite1 = spawn_thread(
+            hog_cpu, 0, PRIORITY_NORMAL, false, false);
 
     /* start thread to print date/time on screen */
-    thread_t* date_printer = start_kernel_thread(
-            print_date, 0, PRIORITY_NORMAL, false);
+    thread_t* date_printer = spawn_thread(
+            print_date, 0, PRIORITY_NORMAL, false, false);
 
     /* start thread to read keyboard input and echo it to screen */
-    thread_t* echoer = start_kernel_thread(
-            echo_input, 0, PRIORITY_NORMAL, false);
+    thread_t* echoer = spawn_thread(
+            echo_input, 72, PRIORITY_NORMAL, false, false);
 
-    /* thread_t *init = start_kernel_thread( */
-    /*         usermode_init, 0, PRIORITY_NORMAL, false); */
+    thread_t *test = spawn_thread(
+            usermode_test, 5, PRIORITY_NORMAL, false, true);
 
-    /* wait for child threads to finish (forever) */
-    /* join(init); */
-    join(echoer);
+    /* wait for some thread to finish (forever) */
     join(date_printer);
-    join(infinite0);
-    join(infinite1);
 
     /* playing around */
     /* kprintf("%u\n", 1 / 0); */
@@ -197,32 +162,52 @@ static void print_date(uint32_t arg)
     unsigned int row, col;
     struct tm dt;
     while (true) {
-        sleep(50);
+        sleep(200);
         datetime(&dt);
         kget_cursor(&row, &col);
-        kset_cursor(0, 58);
-        kprintf("%02u:%02u:%02u %s %02u, %04u\n", dt.hour, dt.min, dt.sec,
+        kset_cursor(arg, 58);
+        kprintf("%02u:%02u:%02u %s %02u, %04u", dt.hour, dt.min, dt.sec,
                 month_name(dt.month), dt.mday, dt.year);
         kset_cursor(row, col);
     }
-    exit(0);
 }
 
 void echo_input(uint32_t arg)
 {
     (void)arg;
-    while (true) {
+    unsigned int i = 0;
+    for (i = 0; i < arg; i++) {
         keycode_t kc = wait_for_key();
+        if (kc == 'q') {
+            break;
+        }
         kputc(kc);
     }
-    exit(0);
+    kprintf("\nYou've typed enough!\n");
 }
 
 static void hog_cpu(uint32_t arg)
 {
     (void)arg;
-    unsigned int i = 0, j = 0;
-    while (true) {
-        ;
+    while (true) ;
+}
+
+static void usermode_test(uint32_t arg)
+{
+    uprintf("usermode_test looping %u times...\n", arg);
+
+    unsigned int i = 0;
+    for (i = 0; i < arg; i++) {
+        char *dst = (char*)syscall_malloc(42);
+        strcpy(dst, "hello");
+        syscall_free(dst);
+
+        *(char *)VIDEO_ADDR = '$';
+        *(char *)(VIDEO_ADDR + 1) = WHITE_ON_BLACK;
+
+        /* uprintf("Hello from usermode!\n"); */
+        syscall_print("Hello from usermode!\n");
+
+        syscall_sleep(1000);
     }
 }

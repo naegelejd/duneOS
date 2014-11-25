@@ -150,7 +150,7 @@ void irq_install_handler(unsigned int irq, int_handler_t handler)
  * Each IRQ ISR calls this handler (from irq_common_stub),
  * which, in turn, will call IRQ-specific handlers
  */
-void default_irq_handler(struct regs *r)
+void base_irq_handler(struct regs *r)
 {
     /* empty handler pointer */
     int_handler_t handler = NULL;

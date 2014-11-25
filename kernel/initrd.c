@@ -106,7 +106,7 @@ block_device_t* ramdisk_init(uintptr_t start, size_t len)
     ramdisk_device = register_block_device(
             "initrd", 1, (void*)&ramdisk, &ramdisk_block_device_ops);
 
-    start_kernel_thread(handle_ramdisk_requests, 0, PRIORITY_NORMAL, true);
+    spawn_thread(handle_ramdisk_requests, 0, PRIORITY_NORMAL, true, false);
 
     unsigned int nbytes = len / 7;
     KASSERT(test_ramdisk(nbytes) == 0);

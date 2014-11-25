@@ -227,6 +227,7 @@ static void init_tss(struct tss* tss)
 
 void set_kernel_stack(uintptr_t sp)
 {
+    /* DEBUGF("Updating ESP0 in TSS to: %X\n", sp); */
     g_tss.esp0 = sp;
 }
 

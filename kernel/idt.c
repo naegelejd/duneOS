@@ -172,7 +172,7 @@ void int_install_handler(int interrupt, int_handler_t handler)
  * which, in turn, either calls a specific handler, or
  * just prints an exception message and halts the CPU
  */
-void default_int_handler(struct regs *r)
+void base_int_handler(struct regs *r)
 {
     int_handler_t handler = g_handlers[r->int_no];
     if (!handler) {

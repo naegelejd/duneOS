@@ -70,7 +70,7 @@ void rtc_handler(struct regs *r)
      * rather than performing the CMOS reads on demand.
      */
     ticks++;
-    if (ticks / 1024) {
+    if (ticks / 1024 == 1) {
         ticks = 0;
 
         uint8_t sec = read_cmos(0x0);

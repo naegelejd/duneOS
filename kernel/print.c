@@ -6,11 +6,11 @@
 
 enum { NUM_BUF_SIZE = 12 };
 
-typedef void (*cput_t) (char **, char);
-
 static size_t uint2str(char *, unsigned int, unsigned int, bool);
 static int a2d(char);
 static unsigned int str2uint(char **, int);
+
+typedef void (cput_t)(char **, char);
 static void put_string(char **, cput_t, char *, int, bool);
 static size_t kvasprintf(char **, cput_t, char *, va_list);
 
@@ -218,6 +218,28 @@ size_t kprintf(char *fmt, ...)
 
     return sz;
 }
+
+
+#include "syscall.h"
+void uputc(char **s, char c)
+{
+    (void)s;
+    char buf[2];
+    buf[0] = c;
+    syscall_print(buf);
+}
+
+#include <stdarg.h>
+size_t uprintf(char *fmt, ...)
+{
+    va_list arg;
+    size_t sz;
+    va_start(arg, fmt);
+    sz = kvasprintf(NULL, uputc, fmt, arg);
+    va_end(arg);
+    return sz;
+}
+
 
 #ifdef QEMU_DEBUG
 

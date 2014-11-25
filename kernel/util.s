@@ -3,13 +3,11 @@
 section .text
 align 4
 
-; return stack pointer
+; return stack pointer (its value before calling this function)
 global get_esp
 get_esp:
-    sub     esp, 16
-    mov     dword [esp+12], esp
-    mov     eax, dword [esp+12]
-    add     esp, 16
+    mov eax, esp    ; load ESP
+    add eax, 4      ; add 4 bytes to jump over return address
     ret
 
 ; return contents of EFLAGS register
@@ -19,10 +17,17 @@ get_eflags:
     pop eax     ; pop contents into eax
     ret
 
+; returns 0 or 3
+global get_ring
+get_ring:
+    mov eax, cs
+    and eax, 0x03
+    ret
+
 global khalt
 khalt:
-    cli
-    hlt
+    cli     ; disable interrupts so the machine stays halted
+    hlt     ; halt machine
     ret
 
 ; Attempt to triple-fault (doesn't really work)

@@ -4,43 +4,34 @@
 #include "idt.h"
 #include "x86.h"
 #include "mem.h"
+#include "thread.h"
 
 static void print(const char *msg) {
-    kprintf("%s\n", msg);
-}
-
-#include "timer.h"
-static void sleep(unsigned int msec) {
-    unsigned int ticks = msec / 10;
-    if (ticks < 1) { ticks = 1; }
-    delay(ticks);
+    kprintf("%s", msg);
 }
 
 DEFN_SYSCALL1(print, 0, const char*)
 DEFN_SYSCALL1(sleep, 1, unsigned int)
 DEFN_SYSCALL1(malloc, 2, size_t)
+DEFN_SYSCALL1(free, 3, void*)
+DEFN_SYSCALL1(exit, 4, int)
 
 static void *syscalls[] = {
     &print,
     &sleep,
     &malloc,
+    &free,
+    &exit
 };
 size_t num_syscalls = sizeof(syscalls) / sizeof(*syscalls);
 
 #include "thread.h"
 static void syscall_handler(struct regs *regs)
 {
-    uint32_t *esp = get_current_thread()->esp;
-    uint32_t *kesp = get_current_thread()->kernel_esp;
-    DEBUGF("ESP: %X\n%X\n%X\n%X\n%X\n%X\n", esp, *esp, *(esp+1), *(esp+2), *(esp+3), *(esp+4));
-
     if (regs->eax >= num_syscalls) {
         kprintf("%s\n", "Invalid syscall number");
         return;
     }
-
-    extern int get_ring(void);
-    DEBUGF("Handling syscall in ring %d\n", get_ring());
 
     void *location = syscalls[regs->eax];
 

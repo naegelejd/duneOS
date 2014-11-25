@@ -9,6 +9,9 @@ size_t kprintf(char *fmt, ...);
 /* construct a formatted string in buffer 's' */
 size_t ksprintf(char *s, char *fmt, ...);
 
+/* **TEMPORARY** UNBUFFERED userspace printf */
+size_t uprintf(char *fmt, ...);
+
 #ifdef QEMU_DEBUG
 
 #define DEBUG(s) \

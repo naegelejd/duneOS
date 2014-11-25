@@ -4,8 +4,6 @@
 #include "thread.h"
 #include "timer.h"
 
-/* See PIT.h for comments on the Programmable Interval Timer */
-
 void set_timer_frequency(unsigned int hz)
 {
     /* cmd = channel 0, LSB then MSB, Square Wave Mode, 16-bit counter */
@@ -55,8 +53,7 @@ void timer_handler(struct regs *r)
 /* installs timer_handler into IRQ0 */
 void timer_install()
 {
-    /* set frequency to 100 Hz */
-    set_timer_frequency(100);
+    set_timer_frequency(TICKS_PER_SEC);
     irq_install_handler(IRQ_TIMER, timer_handler);
     enable_irq(IRQ_TIMER);
 }

@@ -203,7 +203,7 @@ isr_no_err intno
 %endrep
 
 
-extern default_int_handler
+extern base_int_handler
 ; Common ISR stub
 ; Save processor state, set up for kernel mode segments,
 ; call C-level fault handler, restore processor state
@@ -216,7 +216,7 @@ isr_common_stub:
     mov gs, ax
     mov eax, esp    ; Push pointer to the stack (struct regs *)
     push eax
-    mov eax, default_int_handler
+    mov eax, base_int_handler
     call eax        ; A special call, preserves the 'eip' register
     pop eax         ; Pop pointer to stack (struct regs *)
     popregs
@@ -253,11 +253,11 @@ irq_handle 14    ; IRQ 14 (IDT 46)
 irq_handle 15    ; IRQ 14 (IDT 47)
 
 
-extern default_irq_handler
+extern base_irq_handler
 extern g_need_reschedule
 extern wake_sleepers
 extern get_next_runnable
-; calls default_irq_handler defined in 'irq.c'
+; calls base_irq_handler defined in 'irq.c'
 irq_common_stub:
     pushregs
     mov ax, KERNEL_DS   ; load kernel data segment descriptor
@@ -267,7 +267,7 @@ irq_common_stub:
     mov gs, ax
     mov eax, esp
     push eax
-    mov eax, default_irq_handler
+    mov eax, base_irq_handler
     call eax        ; preserves EIP ?
     pop eax
 
@@ -283,6 +283,10 @@ irq_common_stub:
     call get_next_runnable
     mov [g_current_thread], eax
     mov esp, [eax+0]
+
+    push dword [eax+12]
+    call set_kernel_stack
+    pop eax
 
     mov [g_need_reschedule], dword 0
 
@@ -323,54 +327,54 @@ switch_to_thread:
 
     mov eax, [g_current_thread]
     mov [eax+0], esp            ; set thread's stack pointer
-
     mov [eax+4], dword 0        ; clear num_ticks field
 
-    mov eax, [esp + 64]         ; load pointer to new thread
-                                ; skipping sizeof(struct regs)
+    mov eax, [esp + 64] ; load pointer to new thread, skipping sizeof(struct regs)
 
     mov [g_current_thread], eax ; update new current thread
     mov esp, [eax+0]            ; update ESP
 
-    ;push dword [eax+8]
-    ;call set_kernel_stack
-    ;pop eax
+    push dword [eax+12]
+    call set_kernel_stack
+    pop eax
 
     popregs
     add esp, 8      ; skip over fake error code, fake INT number
+    iret            ; pop EIP, CS, EFLAGS, SS, and ESP; jump to EIP
 
-    iret
 
 global start_user_mode
 start_user_mode:
-    cli
-    mov ax, USERMODE_DS | 0x03  ; ring-3
+    cli                         ; disable interrupts
+
+    ;xchg bx, bx                ; Bochs magic breakpoint
+
+    mov eax, [esp]              ; load addr of start_func from stack
+    mov [esp-16], eax           ; move it down 4 dword
+    add esp, 4                  ; move ESP up a dword (leaving room for 4 dwords)
+
+    mov ax, USERMODE_DS | 0x03  ; ring-3 data segment descriptors
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    mov eax, esp
-    push USERMODE_DS | 0x03     ; ring-3
-    push eax
+    mov eax, [g_current_thread]   ; load thread's user ESP
+    mov eax, [eax+8]
 
-    pushf
-    ; Set IF flag in EFLAGS to automatically re-enable interrupts
+    push USERMODE_DS | 0x03     ; ring-3 stack segment descriptor
+    push eax                    ; push user ESP
+
+    pushf                       ; push EFLAGS
     pop eax
-    or eax, 0x200
+    or eax, 0x200               ; enable interrupts in EFLAGS
     push eax
 
-    push USERMODE_CS | 0x03     ; ring-3
-    push user_mode_next
-    iret
-user_mode_next:
-    ret
+    push USERMODE_CS | 0x03     ; ring-3 code segment descriptor
+    sub esp, 4                  ; pretend we pushed the return address (start_func)
+                                ; start_func is already here!
+    iret                        ; 'return' to user mode thread code
 
-global get_ring
-get_ring:
-    mov eax, cs
-    and eax, 0x03
-    ret
 
 section .bss
 global kernel_stack_bottom

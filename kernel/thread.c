@@ -34,7 +34,7 @@
 #include "thread.h"
 
 /* List of all threads in the system */
-static thread_queue_t all_threads;
+static thread_t* all_threads_head;
 
 /* Queue of runnable threads */
 static thread_queue_t run_queue;
@@ -61,6 +61,7 @@ static unsigned int tlocal_key_counter;
 /* Array of destructors for correspondingly keyed thread-local data */
 static tlocal_destructor_t tlocal_destructors[MAX_TLOCAL_KEYS];
 
+typedef void (thread_launch_func_t)(void);
 
 /*
  * Add a thread to the list of all threads
@@ -69,13 +70,13 @@ static void all_threads_add(thread_t* thread)
 {
     KASSERT(thread);
 
-    if (all_threads.head == NULL) {
-        all_threads.head = thread;
-    } else if (all_threads.tail != NULL) {
-        all_threads.tail->list_next = thread;
-    }
     thread->list_next = NULL;
-    all_threads.tail = thread;
+    thread_t **t = &all_threads_head;
+    while (*t != NULL) {
+        KASSERT(*t != thread);
+        t = &(*t)->list_next;
+    }
+    *t = thread;
 }
 
 /*
@@ -84,14 +85,16 @@ static void all_threads_add(thread_t* thread)
 static void all_threads_remove(thread_t* thread)
 {
     KASSERT(thread);
-    thread_t** t = &all_threads.head;
-    while (*t) {
+
+    thread_t** t = &all_threads_head;
+    while (*t != NULL) {
         if (thread == *t) {
             *t = (*t)->list_next;
-            return;
+            break;
         }
         t = &(*t)->list_next;
     }
+    thread->list_next = NULL;
 }
 
 
@@ -114,42 +117,85 @@ bool thread_queue_empty(thread_queue_t* queue)
     return false;
 }
 
+static bool contains_thread(thread_queue_t* queue, thread_t* thread)
+{
+    KASSERT(!interrupts_enabled());
+    KASSERT(queue);
+    KASSERT(thread);
+
+    thread_t *cur = queue->head;
+    while (cur) {
+        if (cur == thread) {
+            return true;
+        }
+        cur = cur->queue_next;
+    }
+
+    KASSERT(thread != queue->tail); /* paranoia */
+
+    return false;
+}
+
 /*
  * Add a thread to a thread queue.
  */
 static void enqueue_thread(thread_queue_t* queue, thread_t* thread)
 {
+    KASSERT(!interrupts_enabled());
     KASSERT(queue);
     KASSERT(thread);
 
-    if (queue->head == NULL) {
-        queue->head = thread;
-    } else if (queue->tail != NULL) {
-        queue->tail->queue_next = thread;
-    }
-
+    /* ensure thread points to no next thread */
     thread->queue_next = NULL;
-    queue->tail = thread;
+
+    /* overkill - make sure thread is not already in queue */
+    KASSERT(!contains_thread(queue, thread));
+
+    if (NULL == queue->head) {
+        KASSERT(NULL == queue->tail);   /* paranoia */
+        queue->head = thread;
+        queue->tail = thread;
+    } else if (queue->head == queue->tail) {
+        KASSERT(NULL == queue->head->queue_next);   /* paranoia */
+        queue->tail->queue_next = thread;
+        queue->tail = thread;
+    } else {
+        queue->tail->queue_next = thread;
+        queue->tail = thread;
+    }
 }
 
 /*
- * Remove a thread from a thread queue
- * LOL @ no temporary 'prev' pointer, thanks Linus...
+ * Very carefully remove all instances of a thread from a queue
  */
 static void dequeue_thread(thread_queue_t* queue, thread_t* thread)
 {
+    KASSERT(!interrupts_enabled());
     KASSERT(queue);
-    KASSERT(queue->head);
     KASSERT(thread);
 
-    thread_t** t = &queue->head;
-    while (*t) {
-        if (thread == *t) {
-            *t = (*t)->queue_next;
-            return;
+    thread_t* cur = queue->head;
+    thread_t* prev = NULL;
+    while (cur) {
+        if (thread == cur) {
+            if (cur == queue->head) {
+                /* remove head */
+                queue->head = cur->queue_next;
+            } else {
+                /* remove thread in the middle */
+                prev->queue_next = cur->queue_next;
+            }
+        } else {
+            /* increment 'prev' only if cur was NOT removed */
+            prev = cur;
         }
-        t = &(*t)->queue_next;
+        cur = cur->queue_next;
     }
+
+    queue->tail = prev;
+
+    /* ensure thread is no longer pointing to its former 'next' thread */
+    thread->queue_next = NULL;
 }
 
 /*
@@ -196,62 +242,67 @@ static inline void push_dword(thread_t* thread, uint32_t value)
  * Initialize members of a kernel thread
  */
 static void init_thread(thread_t* thread, void* stack_page,
-        void* kernel_stack_page, priority_t priority, bool detached)
+        void* user_stack_page, priority_t priority, bool detached)
 {
     static unsigned int next_free_id = 0;
 
-    thread_t* owner = detached ? NULL : g_current_thread;
-
     memset(thread, 0, sizeof(thread_t));
-    thread->stack_page = stack_page;
+
+    thread->id = next_free_id++;
+
+    thread->stack_base = stack_page;
     /* TODO: don't assume thread stack is PAGE_SIZE bytes */
     thread->esp = (uintptr_t)stack_page + PAGE_SIZE;
+    thread->stack_top = thread->esp;
 
-    thread->kernel_esp = (uintptr_t)kernel_stack_page + PAGE_SIZE;
+    thread->user_stack_base = user_stack_page;
+    thread->user_esp = (user_stack_page != NULL) ?
+            (uintptr_t)user_stack_page + PAGE_SIZE : 0;
 
     thread->priority = priority;
-    thread->owner = owner;
+    thread->owner = detached ? NULL : g_current_thread;
 
     thread->refcount = detached ? 1 : 2;
     thread->alive = true;
 
     thread_queue_clear(&thread->join_queue);
 
-    thread->id = next_free_id++;
-    DEBUGF("New thread pid: %d\n", thread->id);
+    DEBUGF("new thread @ 0x%X, id: %d, esp: %X\n",
+            thread, thread->id, thread->esp, thread->user_esp);
 }
 
 /*
  * Create new raw thread object.
  * @returns NULL if out of memory
  */
-static thread_t* create_thread(unsigned int priority, bool detached)
+static thread_t* create_thread(unsigned int priority, bool detached, bool usermode)
 {
     thread_t *thread = alloc_page();
-    DEBUGF("Allocated page @ 0x%x for thread context\n", thread);
+    DEBUGF("Allocated thread 0x%X\n", thread);
     if (!thread) {
         kprintf("Failed to allocate page for thread\n");
         return NULL;
     }
 
     void *stack_page = alloc_page();
-    DEBUGF("Allocated page @ 0x%x for thread stack\n", stack_page);
     if (!stack_page) {
         kprintf("Failed to allocate page for thread stack\n");
         free_page(thread);
         return NULL;
     }
 
-    void* kernel_stack_page = alloc_page();
-    DEBUGF("Allocated page @ 0x%x for thread kernel stack\n", kernel_stack_page);
-    if (!stack_page) {
-        kprintf("Failed to allocate page for thread kernel stack\n");
-        free_page(thread);
-        return NULL;
+    void *user_stack_page = NULL;
+    if (usermode) {
+        user_stack_page = alloc_page();
+        if (!user_stack_page) {
+            kprintf("Failed to allocate page for thread user stack\n");
+            free_page(stack_page);
+            free_page(thread);
+            return NULL;
+        }
     }
 
-
-    init_thread(thread, stack_page, kernel_stack_page, priority, detached);
+    init_thread(thread, stack_page, user_stack_page, priority, detached);
 
     all_threads_add(thread);
 
@@ -266,7 +317,11 @@ static void destroy_thread(thread_t* thread)
 {
     KASSERT(thread);
     cli();
-    free_page(thread->stack_page);
+
+    free_page(thread->stack_base);
+    if (thread->user_stack_base) {
+        free_page(thread->user_stack_base);
+    }
     free_page(thread);
 
     all_threads_remove(thread);
@@ -282,6 +337,7 @@ static void reap_thread(thread_t* thread)
 {
     KASSERT(!interrupts_enabled());
     KASSERT(thread);
+    DEBUGF("reaping thread %d\n", thread->id);
     enqueue_thread(&graveyard_queue, thread);
     wake_all(&reaper_wait_queue);
 }
@@ -295,6 +351,8 @@ static void detach_thread(thread_t* thread)
     KASSERT(thread);
     KASSERT(thread->refcount > 0);
 
+    DEBUGF("detaching thread %d\n", thread->id);
+
     --thread->refcount;
     if (thread->refcount == 0) {
         reap_thread(thread);
@@ -305,69 +363,112 @@ static void detach_thread(thread_t* thread)
  * Perform any necessary initialization before a thread start function
  * is executed. It currently only enables interrupts
  */
-static void launch_thread(void)
+static void launch_kernel_thread(void)
 {
     /* DEBUGF("Launching thread %d\n", g_current_thread->id); */
     /* DEBUGF("%s\n", interrupts_enabled() ? "interrupts enabled\n" : "interrupts disabled\n"); */
     sti();
 }
 
+static void launch_user_thread(void)
+{
+    /* Now, 'start' user mode */
+    extern void start_user_mode();
+    start_user_mode();
+}
+
 /*
  * Shutdown a kernel thread if it exits by falling
  * off the end of its start function
  */
-static void shutdown_thread(void)
+static void shutdown_kernel_thread(void)
 {
     /* DEBUGF("Shutting down thread %d\n", g_current_thread->id); */
     exit(0);
 }
 
-/*
- * Set up the initial context for a kernel-mode only thread
- */
-static void setup_kernel_thread(thread_t* thread,
-        thread_start_func_t start_func, uint32_t arg)
+static void shutdown_user_thread(void)
 {
-    /* push the arg to the thread start function */
-    push_dword(thread, arg);
+    syscall_exit(0);
+}
 
-    /* push the address of the shutdown_thread function as the
-     * return address. this forces the thread to exit */
-    push_dword(thread, (uintptr_t)&shutdown_thread);
+static void setup_thread_stack(thread_t* thread,
+        thread_start_func_t start_func, uint32_t arg, bool usermode)
+{
+    uint32_t *esp = (uint32_t*)thread->esp;
 
-    /* push the address of the start function */
-    push_dword(thread, (uintptr_t)start_func);
+    if (usermode) {
+        /* Set up CPL=3 stack */
+        uint32_t *uesp = thread->user_esp;
+        KASSERT(uesp != NULL);
 
-    /* to make the thread schedulable, we need to make it look like
-     * it was suspended by an interrupt in user mode.
-     * so push all the interrupt stack values onto the stack */
-    push_dword(thread, 0UL);  /* EFLAGS */
+        /* push the arg to the thread start function */
+        *--uesp = arg;
 
-    /* push address of the launch_thread function as the "return address",
-     * so when we call "iret", it jumps to launch_thread */
-    push_dword(thread, CODE_SEG_SELECTOR);
-    push_dword(thread, (uintptr_t)&launch_thread);
+        /* push the address of the shutdown_thread function as the
+        * return address. this forces the thread to exit */
+        *--uesp = shutdown_user_thread;
+
+        thread->user_esp = uesp;
+
+        /* Set up CPL=0 stack */
+        /* DEBUGF("Address of start_func: %X\n", start_func); */
+        *--esp = start_func;
+
+        extern void start_user_mode(void);
+        /* to make the thread schedulable, we need to make it look like
+        * it was suspended by an interrupt in user mode.
+        * so push all the interrupt stack values onto the stack */
+        /* push address of the launch_thread function as the "return address",
+        * so when we call "iret", it jumps to launch_thread */
+        *--esp = 0x0UL; /* EFLAGS - interrupts still disabled */
+        *--esp = CODE_SEG_SELECTOR;
+        *--esp = start_user_mode;
+    } else {
+        /* push the arg to the thread start function */
+        *--esp = arg;
+
+        /* push the address of the shutdown_thread function as the
+        * return address. this forces the thread to exit */
+        *--esp = shutdown_kernel_thread;
+
+        /* *--esp = start_func; */
+
+        /* to make the thread schedulable, we need to make it look like
+        * it was suspended by an interrupt in user mode.
+        * so push all the interrupt stack values onto the stack */
+        *--esp = 0x202; /* EFLAGS - enable interrupts */
+
+        /* push address of the launch_thread function as the "return address",
+        * so when we call "iret", it jumps to launch_thread */
+        *--esp = CODE_SEG_SELECTOR;
+        /* *--esp = launch_func; */
+        *--esp = start_func;
+    }
 
     /* push fake error code and INT number */
-    push_dword(thread, 0);
-    push_dword(thread, 0);
+    *--esp = 0;
+    *--esp = 0;
 
     /* push general registers */
-    push_dword(thread, 0);    /* eax */
-    push_dword(thread, 0);    /* ecx */
-    push_dword(thread, 0);    /* edx */
-    push_dword(thread, 0);    /* ebx */
-    push_dword(thread, 0);    /* ebp */
-    push_dword(thread, 0);    /* esi */
-    push_dword(thread, 0);    /* edi */
+    *--esp = 0;     /* eax */
+    *--esp = 0;     /* ecx */
+    *--esp = 0;     /* edx */
+    *--esp = 0;     /* ebx */
+    *--esp = 0;     /* ebp */
+    *--esp = 0;     /* esi */
+    *--esp = 0;     /* edi */
 
     /* push values for saved segment registers.
      * only the DS and ES registers contain valid selectors
      * (FS and GS not used by GCC) */
-    push_dword(thread, DATA_SEG_SELECTOR);
-    push_dword(thread, DATA_SEG_SELECTOR);
-    push_dword(thread, 0);
-    push_dword(thread, 0);
+    *--esp = DATA_SEG_SELECTOR;
+    *--esp = DATA_SEG_SELECTOR;
+    *--esp = DATA_SEG_SELECTOR;
+    *--esp = DATA_SEG_SELECTOR;
+
+    /* update thread's ESP */
+    thread->esp = esp;
 }
 
 static void idle(uint32_t arg)
@@ -422,13 +523,19 @@ void wake_sleepers(void)
     thread_t* thread = sleep_queue.head;
 
     while (thread) {
+        /* DEBUGF("attempting to wake thread %d\n", thread->id); */
         next = thread->queue_next;
         if (get_ticks() >= thread->sleep_until) {
+            /* DEBUGF("waking thread %d (%u >= %u)\n", */
+                    /* thread->id, get_ticks(), thread->sleep_until); */
             thread->sleep_until = 0;
             /* time to wake up this sleeping thread...
              * so remove it from sleep queue and make it runnable */
             dequeue_thread(&sleep_queue, thread); /* FIXME - dumb inefficient */
             make_runnable(thread);
+        } else {
+            /* DEBUGF("thread %d still sleeping (%u < %u)\n", */
+                    /* thread->id, get_ticks(), thread->sleep_until); */
         }
         thread = next;
     }
@@ -568,15 +675,21 @@ int join(thread_t* thread)
  * number of timer ticks have passed from the time
  * `sleep` is called.
  */
-void sleep(unsigned int ticks)
+void sleep(unsigned int milliseconds)
 {
     KASSERT(g_current_thread);
 
-    cli();
+    unsigned int ticks = milliseconds * TICKS_PER_SEC / 1000;
+    if (ticks < 1) { ticks = 1; }
+
+    bool iflag = beg_int_atomic();
     g_current_thread->sleep_until = get_ticks() + ticks;
+    KASSERT(!interrupts_enabled());
     enqueue_thread(&sleep_queue, g_current_thread);
+    /* DEBUGF("thread %d sleeping until %u\n", g_current_thread->id, */
+            /* g_current_thread->sleep_until); */
     schedule();
-    sti();
+    end_int_atomic(iflag);
 }
 
 /*
@@ -667,7 +780,8 @@ void schedule(void)
     KASSERT(runnable);
     KASSERT(g_current_thread);
 
-    /* DEBUGF("switching from thread %d to thread %d\n", g_current_thread->id, runnable->id); */
+    /* DEBUGF("switching from thread %d to thread %d\n", */
+            /* g_current_thread->id, runnable->id); */
     switch_to_thread(runnable);
 }
 
@@ -676,22 +790,21 @@ void schedule(void)
  * integer argument to that function, its priority, and whether
  * it should be detached from the current running thread.
  */
-thread_t* start_kernel_thread(thread_start_func_t start_function, uint32_t arg,
-        priority_t priority, bool detached)
+thread_t* spawn_thread(thread_start_func_t start_func, uint32_t arg,
+        priority_t priority, bool detached, bool usermode)
 {
-    KASSERT(start_function);
+    KASSERT(start_func);
 
-    thread_t* thread = create_thread(priority, detached);
+    thread_t* thread = create_thread(priority, detached, usermode);
     KASSERT(thread);    /* was thread created? */
 
-    if (thread) {
-        setup_kernel_thread(thread, start_function, arg);
+    setup_thread_stack(thread, start_func, arg, usermode);
 
-        make_runnable_atomic(thread);
-    }
+    make_runnable_atomic(thread);
 
     return thread;
 }
+
 
 /*
  * Initialize the scheduler.
@@ -706,13 +819,13 @@ void scheduler_init(void)
     KASSERT(main_thread);
 
     init_thread(main_thread, (void*)&kernel_stack_bottom,
-            (void*)&kernel_stack_bottom, PRIORITY_NORMAL, true);
+            NULL, PRIORITY_NORMAL, true);
     g_current_thread = main_thread;
     all_threads_add(g_current_thread);
 
-    start_kernel_thread(idle, 0, PRIORITY_IDLE, true);
+    spawn_thread(idle, 0, PRIORITY_IDLE, true, false);
 
-    start_kernel_thread(reaper, 0, PRIORITY_NORMAL, true);
+    spawn_thread(reaper, 0, PRIORITY_NORMAL, true, false);
 }
 
 
@@ -720,9 +833,8 @@ void dump_thread_info(thread_t* th)
 {
     KASSERT(th);
     DEBUGF("esp: 0x%X\n", th->esp);
-    DEBUGF("kernel esp: 0x%X\n", th->kernel_esp);
     DEBUGF("num_ticks: %u\n", th->num_ticks);
-    DEBUGF("stack_page: 0x%0X\n", th->stack_page);
+    DEBUGF("user esp: 0x%X\n", th->user_esp);
     DEBUGF("sleep_until: %u\n", th->sleep_until);
     DEBUGF("queue_next: 0x%0X\n", th->queue_next);
     DEBUGF("list_next: 0x%0X\n", th->list_next);
@@ -737,13 +849,12 @@ void dump_all_threads_list(void)
     int count = 0;
     bool iflag = beg_int_atomic();
 
-    thread = all_threads.head;
+    thread = all_threads_head;
 
     kprintf("[");
     while (thread != NULL) {
         ++count;
         kprintf("<%x %x>", (uintptr_t)thread, (uintptr_t)thread->list_next);
-        //KASSERT(thread != thread->list_next);
         thread = thread->list_next;
     }
     kprintf("]\n");
