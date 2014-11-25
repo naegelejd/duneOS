@@ -230,8 +230,8 @@ isr_common_stub:
 %macro irq_handle 1
 global irq%1
 irq%1:
-    push byte 0
-    push byte 32+%1
+    push byte 0         ; no error code
+    push byte 32+%1     ; interrupt number
     jmp irq_common_stub
 %endmacro
 
@@ -255,8 +255,7 @@ irq_handle 15    ; IRQ 14 (IDT 47)
 
 extern base_irq_handler
 extern g_need_reschedule
-extern wake_sleepers
-extern get_next_runnable
+extern schedule
 ; calls base_irq_handler defined in 'irq.c'
 irq_common_stub:
     pushregs
@@ -270,29 +269,17 @@ irq_common_stub:
     mov eax, base_irq_handler
     call eax        ; preserves EIP ?
     pop eax
-
-    cmp [g_need_reschedule], dword 0
-    je .restore
-
-    call wake_sleepers
-
-    mov eax, [g_current_thread]
-    mov [eax+0], esp            ; set thread's stack pointer
-    mov [eax+4], dword 0        ; clear num_ticks field
-
-    call get_next_runnable
-    mov [g_current_thread], eax
-    mov esp, [eax+0]
-
-    push dword [eax+12]
-    call set_kernel_stack
-    pop eax
-
-    mov [g_need_reschedule], dword 0
-
-.restore:
     popregs
     add esp, 8      ; clean up pushed error code and ISR number
+
+    ; handle preemption after handling interrupt and sending PIC end-of-interrupt
+    cmp [g_need_reschedule], dword 0
+    je .restore
+    mov [g_need_reschedule], dword 0
+
+    call schedule
+
+.restore:
     iret            ; pop EIP, CS, EFLAGS, SS, and ESP; jump to EIP
 
 
@@ -300,36 +287,25 @@ irq_common_stub:
 ; when switch_to_thread is called, the stack looks like:
 ;       - pointer to thread
 ;       - func return address
-; but we change it to look like:
-;       - pointer to thread
-;       - EFLAGS
-;       - CS
-;       - func return address
-; so it looks like an interrupt occurred
 extern g_current_thread
 extern set_kernel_stack
 global switch_to_thread
 switch_to_thread:
     ;xchg bx, bx         ; BOCHS magic breakpoint
-    push eax            ; save eax
-    mov eax, [esp+4]    ; put return address in eax
-    mov [esp-4], eax    ; move return address down 8 bytes
-    add esp, 8
-    pushfd              ; push EFLAGS
-    mov eax, [esp-4]    ; restore saved value of eax
-    push dword KERNEL_CS
-    sub esp, 4          ; move esp back to return address
 
-    push dword 0        ; push fake interrupt error code
-    push dword 0        ; push fake interrupt number
-
-    pushregs
+    push eax
+    push ecx
+    push edx
+    push ebx
+    push ebp
+    push esi
+    push edi
 
     mov eax, [g_current_thread]
     mov [eax+0], esp            ; set thread's stack pointer
     mov [eax+4], dword 0        ; clear num_ticks field
 
-    mov eax, [esp + 64] ; load pointer to new thread, skipping sizeof(struct regs)
+    mov eax, [esp + 32] ; load pointer to new thread, skipping sizeof(struct regs)
 
     mov [g_current_thread], eax ; update new current thread
     mov esp, [eax+0]            ; update ESP
@@ -338,9 +314,15 @@ switch_to_thread:
     call set_kernel_stack
     pop eax
 
-    popregs
-    add esp, 8      ; skip over fake error code, fake INT number
-    iret            ; pop EIP, CS, EFLAGS, SS, and ESP; jump to EIP
+    pop edi
+    pop esi
+    pop ebp
+    pop ebx
+    pop edx
+    pop ecx
+    pop eax
+
+    ret
 
 
 global start_user_mode

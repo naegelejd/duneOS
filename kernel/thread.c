@@ -416,13 +416,6 @@ static void setup_thread_stack(thread_t* thread,
         *--esp = start_func;
 
         extern void start_user_mode(void);
-        /* to make the thread schedulable, we need to make it look like
-        * it was suspended by an interrupt in user mode.
-        * so push all the interrupt stack values onto the stack */
-        /* push address of the launch_thread function as the "return address",
-        * so when we call "iret", it jumps to launch_thread */
-        *--esp = 0x0UL; /* EFLAGS - interrupts still disabled */
-        *--esp = CODE_SEG_SELECTOR;
         *--esp = start_user_mode;
     } else {
         /* push the arg to the thread start function */
@@ -432,23 +425,10 @@ static void setup_thread_stack(thread_t* thread,
         * return address. this forces the thread to exit */
         *--esp = shutdown_kernel_thread;
 
-        /* *--esp = start_func; */
-
-        /* to make the thread schedulable, we need to make it look like
-        * it was suspended by an interrupt in user mode.
-        * so push all the interrupt stack values onto the stack */
-        *--esp = 0x202; /* EFLAGS - enable interrupts */
-
-        /* push address of the launch_thread function as the "return address",
-        * so when we call "iret", it jumps to launch_thread */
-        *--esp = CODE_SEG_SELECTOR;
-        /* *--esp = launch_func; */
         *--esp = start_func;
-    }
 
-    /* push fake error code and INT number */
-    *--esp = 0;
-    *--esp = 0;
+        *--esp = launch_kernel_thread;
+    }
 
     /* push general registers */
     *--esp = 0;     /* eax */
@@ -458,14 +438,6 @@ static void setup_thread_stack(thread_t* thread,
     *--esp = 0;     /* ebp */
     *--esp = 0;     /* esi */
     *--esp = 0;     /* edi */
-
-    /* push values for saved segment registers.
-     * only the DS and ES registers contain valid selectors
-     * (FS and GS not used by GCC) */
-    *--esp = DATA_SEG_SELECTOR;
-    *--esp = DATA_SEG_SELECTOR;
-    *--esp = DATA_SEG_SELECTOR;
-    *--esp = DATA_SEG_SELECTOR;
 
     /* update thread's ESP */
     thread->esp = esp;
