@@ -22,8 +22,8 @@ KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.h) $(wildcard $(
 KERN_OBJS := $(addprefix $(OBJDIR)/,\
 	start.o main.o io.o gdt.o idt.o irq.o int.o bget.o mem.o \
 	paging.o syscall.o thread.o blkdev.o initrd.o \
-	timer.o kb.o spkr.o rtc.o screen.o string.o print.o util.o \
-	elf.o ext2.o fat.o)
+	timer.o kb.o mouse.o spkr.o rtc.o screen.o string.o print.o \
+	util.o elf.o ext2.o fat.o)
 
 KERNEL = kernel.bin
 ISO = Dune32.iso

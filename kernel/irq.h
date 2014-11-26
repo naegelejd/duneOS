@@ -6,7 +6,8 @@
 enum {
     IRQ_TIMER = 0,
     IRQ_KEYBOARD = 1,
-    IRQ_RTC = 8
+    IRQ_RTC = 8,
+    IRQ_MOUSE = 12
 };
 
 void irq_install();

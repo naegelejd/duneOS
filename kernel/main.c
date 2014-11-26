@@ -12,6 +12,7 @@
 #include "kb.h"
 #include "rtc.h"
 #include "timer.h"
+#include "mouse.h"
 #include "blkdev.h"
 #include "initrd.h"
 
@@ -21,6 +22,30 @@ static void print_date(uint32_t arg);
 static void echo_input(uint32_t arg);
 static void hog_cpu(uint32_t arg);
 static void usermode_test(uint32_t arg);
+
+void stat_mouse(uint32_t arg)
+{
+    (void)arg;
+    unsigned int row, col;
+    extern int8_t g_mouse_dx, g_mouse_dy;
+    extern bool g_mouse_left, g_mouse_right;
+    while (true) {
+        kget_cursor(&row, &col);
+        kset_cursor(24, 64);
+        kprintf("%02d,%02d", g_mouse_dx, g_mouse_dy);
+        if (g_mouse_left) {
+            kset_cursor(24, 70);
+            kprintf("l");
+        }
+        if (g_mouse_right) {
+            kset_cursor(24, 72);
+            kprintf("r");
+        }
+        kset_cursor(row, col);
+        sleep(200);
+    }
+}
+
 
 struct modinfo {
     uintptr_t start;
@@ -82,6 +107,7 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     timer_install();
     keyboard_install();
     rtc_install();
+    mouse_install();
     syscalls_install();
 
     scheduler_init();
@@ -139,6 +165,9 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     thread_t* echoer = spawn_thread(
             echo_input, 72, PRIORITY_NORMAL, false, false);
 
+    thread_t* mouser = spawn_thread(
+            stat_mouse, 0, PRIORITY_NORMAL, false, false);
+
     thread_t *test = spawn_thread(
             usermode_test, 5, PRIORITY_NORMAL, false, true);
 
@@ -162,13 +191,13 @@ static void print_date(uint32_t arg)
     unsigned int row, col;
     struct tm dt;
     while (true) {
-        sleep(200);
         datetime(&dt);
         kget_cursor(&row, &col);
         kset_cursor(arg, 58);
         kprintf("%02u:%02u:%02u %s %02u, %04u", dt.hour, dt.min, dt.sec,
                 month_name(dt.month), dt.mday, dt.year);
         kset_cursor(row, col);
+        sleep(200);
     }
 }
 
