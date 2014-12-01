@@ -21,7 +21,7 @@ INCLUDES = -I$(KERNDIR)/
 KERN_SRCS := $(wildcard $(KERNDIR)/*.c) $(wildcard $(KERNDIR)/*.h) $(wildcard $(KERNDIR)/*.asm)
 KERN_OBJS := $(addprefix $(OBJDIR)/,\
 	start.o main.o io.o gdt.o idt.o irq.o int.o bget.o mem.o \
-	paging.o syscall.o thread.o blkdev.o initrd.o \
+	paging.o syscall.o thread.o blkdev.o initrd.o pci.o \
 	timer.o kb.o mouse.o spkr.o rtc.o screen.o string.o print.o \
 	util.o elf.o ext2.o fat.o)
 

@@ -13,6 +13,7 @@
 #include "rtc.h"
 #include "timer.h"
 #include "mouse.h"
+#include "pci.h"
 #include "blkdev.h"
 #include "initrd.h"
 
@@ -109,6 +110,9 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     rtc_install();
     mouse_install();
     syscalls_install();
+
+    pci_check_all_buses();
+    khalt();
 
     scheduler_init();
     kprintf("Scheduler initialized\n");

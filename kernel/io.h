@@ -4,16 +4,22 @@
 #include <stdint.h>
 
 /* Read byte from port */
-uint8_t inportb (uint16_t port);
+uint8_t inportb(uint16_t port);
 
 /* Write byte to port */
-void outportb (uint16_t port, uint8_t data);
+void outportb(uint16_t port, uint8_t data);
 
 /* Read word from port */
-uint16_t inportw (uint16_t port);
+uint16_t inportw(uint16_t port);
 
 /* Write word to port */
-void outportw (uint16_t port, uint16_t data);
+void outportw(uint16_t port, uint16_t data);
+
+/* Read double word from port */
+uint32_t inportl(uint16_t port);
+
+/* Write double word to port */
+uint32_t outportl(uint16_t port, uint32_t data);
 
 /* Short delay. May be needed when talking to some (slow) I/O devices. */
 void io_delay(void);

@@ -29,6 +29,19 @@ outportw:
     out     dx, ax
     ret
 
+global inportl
+inportl:
+    mov     edx, dword [esp+4]
+    in      eax, dx
+    ret
+
+global outportl
+outportl:
+    mov     eax, dword [esp+8]
+    mov     edx, dword [esp+4]
+    out     dx, eax
+    ret
+
 global io_delay
 io_delay:
     xor     eax, eax
