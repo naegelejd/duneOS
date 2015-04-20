@@ -2,6 +2,7 @@
 romimage: file=$BXSHARE/BIOS-bochs-latest
 vgaromimage: file=$BXSHARE/VGABIOS-elpin-2.40
 ata0-master: type=cdrom, path=Dune32.iso, status=inserted
+ata0-slave: type=disk, path=hda.img, mode=flat
 boot: cdrom, floppy, disk
 mouse: enabled=1
 clock: sync=realtime

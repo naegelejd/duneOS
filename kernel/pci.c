@@ -2,6 +2,9 @@
 #include "print.h"
 #include "pci.h"
 
+/* temporary */
+#include "ata.h"
+
 enum {
     PCI_CONFIG_ADDRESS = 0xCF8,
     PCI_CONFIG_DATA = 0xCFC
@@ -79,16 +82,37 @@ static uint8_t pci_get_secondary_bus(uint8_t bus, uint8_t device, uint8_t functi
     return (word >> 8) & 0xFF;
 }
 
+/* Assumes that function Header type is 0x00 (not a bridge device) */
+static uint32_t pci_get_base_address(uint8_t bus, uint8_t device, uint8_t function, uint8_t barnum)
+{
+    KASSERT(barnum < 6);
+    uint8_t offset = 0x10 + (barnum * 4);
+
+    uint16_t low = pci_config_read_word(bus, device, function, offset);
+    uint16_t high = pci_config_read_word(bus, device, function, offset + 2);
+
+    return low & (high << 16);
+}
+
 static void pci_check_function(uint8_t bus, uint8_t device, uint8_t function)
 {
     uint16_t vendor_id = pci_get_vendor_id(bus, device, function);
-    uint16_t device_id = pci_get_device_id(bus, device, 0);
-    uint8_t class = pci_get_class(bus, device, 0);
-    uint8_t subclass = pci_get_subclass(bus, device, 0);
-    uint8_t interrupt = pci_get_interrupt_line(bus, device, 0);
-    DEBUGF("PCI device function: %d, vendor: %04X, device: %04X, class: %02X, "
-            "subclass: %02X, interrupt: %02d\n",
+    uint16_t device_id = pci_get_device_id(bus, device, function);
+    uint8_t class = pci_get_class(bus, device, function);
+    uint8_t subclass = pci_get_subclass(bus, device, function);
+    uint8_t interrupt = pci_get_interrupt_line(bus, device, function);
+    DEBUGF("PCI bus %d, dev %d, func: %d, venID: %04X, devID: %04X, class: %02X, "
+            "subclass: %02X, int: %02d\n", bus, device,
             function, vendor_id, device_id, class, subclass, interrupt);
+
+    if (class == 0x01) {
+        uint32_t bar0 = pci_get_base_address(bus, device, function, 0);
+        uint32_t bar1 = pci_get_base_address(bus, device, function, 1);
+        uint32_t bar2 = pci_get_base_address(bus, device, function, 2);
+        uint32_t bar3 = pci_get_base_address(bus, device, function, 3);
+        uint32_t bar4 = pci_get_base_address(bus, device, function, 4);
+        ide_initialize(bar0, bar1, bar2, bar3, bar4);
+    }
 
     /* recursive scan */
     if ((class == 0x06) && (subclass == 0x04)) {

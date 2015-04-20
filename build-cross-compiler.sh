@@ -5,10 +5,10 @@ set -vex
 export PREFIX=$HOME/opt/cross
 export TARGET=i386-elf
 export PATH=$PREFIX/bin:$PATH
-export CC="gcc"
-export CXX="g++"
-export CPP="cpp"
-export LD="gcc"
+export CC="gcc-4.9"
+export CXX="g++-4.9"
+export CPP="cpp-4.9"
+export LD="gcc-4.9"
 
 idonthave() {
     md5=$(md5sum "$1" 2>/dev/null | cut -f1 -d\ )

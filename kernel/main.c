@@ -111,9 +111,6 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
     mouse_install();
     syscalls_install();
 
-    pci_check_all_buses();
-    khalt();
-
     scheduler_init();
     kprintf("Scheduler initialized\n");
 
@@ -127,6 +124,8 @@ void kmain(struct multiboot_info *mbinfo, multiboot_uint32_t mboot_magic)
 
     paging_install();
     kprintf("Paging enabled\n");
+
+    pci_check_all_buses();
 
     char *tmp = "Hello World!\n";
     char *new = malloc(strlen(tmp) + 1);

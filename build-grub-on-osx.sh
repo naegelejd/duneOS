@@ -10,6 +10,11 @@
 #   GNU autoconf
 #   GNU flex
 #   GNU bison
+#
+# and I force linked flex/bison because grub needs newer versions.
+#
+# You will also need to build an i386-elf cross compiler (GCC) and make
+# sure its binaries are on your $PATH
 
 set -vex
 
@@ -35,6 +40,10 @@ cp objconv /usr/local/bin/
 # Build GRUB
 cd $build_dir/grub
 ./autogen.sh
-./configure --prefix=$PREFIX
+
+cd $build_dir
+mkdir grub-build
+cd grub-build
+../grub/configure --disable-werror TARGET_CC=i386-elf-gcc TARGET_OBJCOPY=i386-elf-objcopy TARGET_STRIP=i386-elf-strip TARGET_NM=i386-elf-nm TARGET_RANLIB=i386-elf-ranlib --target=i386-elf --prefix=$PREFIX
 make
 make install

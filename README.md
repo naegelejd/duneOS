@@ -28,14 +28,14 @@ This generates an image called `Dune32.iso`, which will run on a VMWare or Virtu
 
 References
 ----------
-GeekOS: http://geekos.sourceforge.net/
 
-OS Dev.org: http://wiki.osdev.org/Main_Page
-
-Bran's Kernel Development Tutorial: http://www.osdever.net/bkerndev/Docs/title.htm
-
-JamesM's Kernel Development Tutorials: http://www.jamesmolloy.co.uk/tutorial_html/index.html
-
-Writing a Simple Operating System from Scratch (PDF): http://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
-
-Building GCC Cross-Compiler: http://wiki.osdev.org/GCC_Cross-Compiler
+- [OS Dev.org](http://wiki.osdev.org/Main_Page)
+- [GeekOS](http://geekos.sourceforge.net/)
+- [JamesM's kernel development tutorials](http://www.jamesmolloy.co.uk/tutorial_html/index.html)
+- [Bona Fide OS Developer](http://www.osdever.net/tutorials/view/writing-a-simple-c-kernel)
+- [Bran's Kernel Development Tutorial](http://www.osdever.net/bkerndev/Docs/title.htm)
+- [The little book about OS development](http://littleosbook.github.io/)
+- [Broken Thorn OS Dev Tutorials](http://www.brokenthorn.com/Resources/OSDevIndex.html)
+- [The Operating System Resource Center](http://www.nondot.org/sabre/os/articles)
+- [Writing a Simple Operating System from Scratch (PDF)](http://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf)
+- [Building GCC Cross-Compiler](http://wiki.osdev.org/GCC_Cross-Compiler)

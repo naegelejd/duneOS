@@ -23,15 +23,15 @@ KERN_OBJS := $(addprefix $(OBJDIR)/,\
 	start.o main.o io.o gdt.o idt.o irq.o int.o bget.o mem.o \
 	paging.o syscall.o thread.o blkdev.o initrd.o pci.o \
 	timer.o kb.o mouse.o spkr.o rtc.o screen.o string.o print.o \
-	util.o elf.o ext2.o fat.o)
+	util.o ata.o elf.o ext2.o fat.o)
 
 KERNEL = kernel.bin
 ISO = Dune32.iso
 GRUB_CFG = grub.cfg
 
 QEMU = qemu-system-i386
-QARGS = -m 32 -initrd modules/hello.bin -debugcon stdio
-# QARGS = -s -S -m 32 -initrd modules/hello.bin -debugcon stdio # -d int,cpu_reset
+QARGS = -m 32 -usb -initrd modules/hello.bin -debugcon stdio
+# QARGS = -s -S -m 32 -usb -initrd modules/hello.bin -debugcon stdio # -d int,cpu_reset
 
 .PHONY: all
 all: $(KERNEL)

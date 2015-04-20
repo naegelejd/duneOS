@@ -42,6 +42,24 @@ outportl:
     out     dx, eax
     ret
 
+global inportsw
+inportsw:
+    cld                             ; clear direction flag
+    mov     edx, dword [esp+12]     ; port to read from
+    mov     edi, dword [esp+8]      ; buffer to read into
+    mov     ecx, dword [esp+4]      ; number of words to read
+    rep insw
+    ret
+
+global outportsw
+outportsw:
+    cld                             ; clear direction flag
+    mov     edx, dword [esp+12]     ; port to write to
+    mov     edi, dword [esp+8]      ; buffer to read from
+    mov     ecx, dword [esp+4]      ; number of words to write
+    rep outsw
+    ret
+
 global io_delay
 io_delay:
     xor     eax, eax

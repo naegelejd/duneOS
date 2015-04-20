@@ -21,6 +21,12 @@ uint32_t inportl(uint16_t port);
 /* Write double word to port */
 uint32_t outportl(uint16_t port, uint32_t data);
 
+/* Read `count` words from `port` into `buffer` */
+void inportsw(uint16_t port, uintptr_t buffer, unsigned int count);
+
+/* Write `count` words from `buffer` to `port` */
+void outportsw(uint16_t port, uintptr_t buffer, unsigned int count);
+
 /* Short delay. May be needed when talking to some (slow) I/O devices. */
 void io_delay(void);
 
