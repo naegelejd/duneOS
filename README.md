@@ -8,6 +8,7 @@ Build Dependencies
 You'll need an i386 C-compiler, linker, etc.
 
 The `build-cross-compiler.sh` script should help you obtain and build GNU binutils and GCC for i386.
+You'll need to define at least the following enviroment variables to point to your existing *GNU* GCC tools: `$CC`, `$CXX`, `$CPP`.
 
 You'll also need `GNU make` and `nasm`.
 
